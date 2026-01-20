@@ -105,7 +105,7 @@ survey_design <- my_df %>%
 # calculating the district level estimates
 district_estimates <- survey_design %>%
   group_by(ADM2_NAME) %>% 
-    summarise(malaria_prevalance = survey_mean(outcome_binary, vartype = "ci", na.rm = TRUE),
+    summarise(malaria_prevalence = survey_mean(outcome_binary, vartype = "ci", na.rm = TRUE),
               act_coverage = survey_mean(act_binary, vartype = "ci", na.rm = TRUE),
               itn_coverage = survey_mean(itn_binary, vartype = "ci", na.rm = TRUE))
 
@@ -136,6 +136,58 @@ tm_shape(map_data_polygons) +
     )
   )
 
-#Greens, act, YlGnBu, purples, itns
 
+
+
+act_data_polygons <- ghana_districts %>%
+  left_join(district_estimates , by = "ADM2_NAME") %>%
+  mutate(
+    # Creating the hover label on the polygon object
+    hover_label = paste0(ADM1_NAME, ": ", round(act_coverage * 100, 1), "%")
+  )
+
+act_cov <- tm_shape(act_data_polygons) +
+  tm_polygons(
+    col = "prevalence",           
+    style = "pretty",
+    palette = "Greens", 
+    title = "ACT upatake",
+    # hover settings 
+    id = "hover_label",           
+    popup.vars = c(               
+      "State" = "ADM1_NAME", 
+      "Rate" = "prevalence",
+      "Lower CI" = "prevalence_low",
+      "Upper CI" = "prevalence_upp"
+    )
+  )
+
+
+itn_data_polygons <- ghana_districts %>%
+  left_join(district_estimates , by = "ADM2_NAME") %>%
+  mutate(
+    # Creating the hover label on the polygon object
+    hover_label = paste0(ADM1_NAME, ": ", round(itn_coverage * 100, 1), "%")
+  )
+
+itn_cov <- tm_shape(itn_data_polygons) +
+  tm_polygons(
+    col = "prevalence",           
+    style = "pretty",
+    palette = "Purples", 
+    title = "ACT upatake",
+    # hover settings 
+    id = "hover_label",           
+    popup.vars = c(               
+      "State" = "ADM1_NAME", 
+      "Rate" = "prevalence",
+      "Lower CI" = "prevalence_low",
+      "Upper CI" = "prevalence_upp"
+    )
+  )
+
+
+act_cov
+itn_cov
+malaria_prev
 
