@@ -62,9 +62,9 @@ library(pagedown)
 
 # Background and Problem
 
-Malaria remains a critical public health challenge in West Africa, yet accurate data at the local district level is often scarce. While Demographic and Health Surveys (DHS) provide essential data on prevalence and intervention coverage, they are designed for national-level precision; when disaggregated to the district (Admin 2) level, these direct estimates rely on small sample sizes, resulting in noisy estimates with high variability.
+Malaria remains a critical public health challenge in West Africa, yet accurate data at the local district level is often scarce. While Demographic and Health Surveys (DHS) provide essential data on prevalence and intervention coverage, they are designed for national-level precision[^1]. when disaggregated to the district (Admin 2) level, these direct estimates rely on small sample sizes, resulting in noisy estimates with high variability[^2].
 
-To overcome this data scarcity, this project employs the Fay-Herriot model, a standard Area-Level Small Area Estimation (SAE) method. This approach borrows strength from auxiliary data, such as census demographics and climate variables like rainfall and altitude, to generate smoothed, robust estimates of malaria burden and intervention coverage for every district. Beyond simple estimation, we leverage these robust values to investigate the causal effect of interventions, adjusting for confounding variables to model counterfactual scenarios and predict how different strategies could reduce the future malaria burden
+To overcome this data scarcity, this project employs the Fay-Herriot model, a standard Area-Level Small Area Estimation (SAE) method. This approach borrows strength from auxiliary data, such as census demographics and climate variables like rainfall and altitude, to generate smoothed, robust estimates of malaria burden and intervention coverage for every district. Beyond simple estimation, we leverage these robust values to investigate the causal effect of interventions, adjusting for confounding variables to model counterfactual scenarios and predict how different strategies could reduce the future malaria burden[^3].
 
 ## Objectives of Project
 
@@ -121,9 +121,11 @@ Counterfactual Projections (Objective 3)
 
 Static Scenario Modelling: We will perform counterfactual analysis i.e. using the causal coefficients estimated in Step 3 to predict what the malaria burden would be under different hypothetical scenarios (e.g., If ITN coverage were increased to 80%...).
 
-Visualization: We will produce maps comparing the Current Status vs. Projected Status to identify the most effective intervention strategy over a Shiny App[
+Visualization: We will produce maps comparing the Current Status vs. Projected Status to identify the most effective intervention strategy over a Shiny App.
 
-[^1]: Weiss, D. J., et al. (2019). "Mapping the global prevalence, incidence, and mortality of Plasmodium falciparum, 2000–17: a spatial and temporal modelling study." The Lancet 394(10195): 322–331.
+[^1]: Corsi, D. J., Neuman, M., Finlay, J. E., & Subramanian, S.. (2012). Demographic and health surveys: a profile. International Journal of Epidemiology, 41(6), 1602–1613. https://doi.org/10.1093/ije/dys184
+[^2]: Rao, Jnk, and Isabel Molina. Small Area Estimation /. Second. Hoboken, New Jersey : Wiley, 2015. Print.
+[^3]: Weiss, D. J., et al. (2019). "Mapping the global prevalence, incidence, and mortality of Plasmodium falciparum, 2000–17: a spatial and temporal modelling study." The Lancet 394(10195): 322–331.
 
 
 # GitHub
