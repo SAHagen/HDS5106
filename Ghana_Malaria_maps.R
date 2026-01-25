@@ -14,6 +14,8 @@ dhs_clusters <- read_sf("dhs_gh/GHGE8AFL.shp") # dhs coordinates
 dhs_children <- read_dta("dhs_gh/GHKR8CFL.dta") # Kr file for ACT treatment and Fever variables
 dhs_hm <- read_dta("dhs_gh/GHPR8CFL.dta") # PR file for nets (ITNs)and malaria test results
 
+
+
 #Filtering for Ghana polygons and re projecting them  into the WGS 84 coordinate reference system
 ghana_districts <- who_boundaries %>%
   filter(ADM0_NAME == "GHANA") %>%
@@ -120,25 +122,26 @@ map_data_polygons <- ghana_districts %>%
 
 tmap_mode("view")
 
-tm_shape(map_data_polygons) +
+malaria_prev <- tm_shape(map_data_polygons) +
   tm_polygons(
-    col = "prevalence",           
-    style = "pretty",
-    palette = "-RdBu", 
-    title = "Malaria Prevelance",
-    # hover settings 
-    id = "hover_label",           
-    popup.vars = c(               
+    fill = "malaria_prevalence",  
+    fill.scale = tm_scale_intervals(
+      values = "-RdBu",           
+      style = "pretty"
+    ),
+    fill.legend = tm_legend(
+      title = "Malaria Prevalence"
+    ),
+    id = "hover_label",
+    popup.vars = c(
       "State" = "ADM1_NAME", 
-      "Rate" = "prevalence",
-      "Lower CI" = "prevalence_low",
-      "Upper CI" = "prevalence_upp"
+      "Rate" = "malaria_prevalence", 
+      "Lower CI" = "malaria_prevalence_low", 
+      "Upper CI" = "malaria_prevalence_upp"
     )
   )
 
-
-
-
+#Act uptake
 act_data_polygons <- ghana_districts %>%
   left_join(district_estimates , by = "ADM2_NAME") %>%
   mutate(
@@ -148,21 +151,24 @@ act_data_polygons <- ghana_districts %>%
 
 act_cov <- tm_shape(act_data_polygons) +
   tm_polygons(
-    col = "prevalence",           
-    style = "pretty",
-    palette = "Greens", 
-    title = "ACT upatake",
+    fill = "act_coverage",
+    fill.scale = tm_scale_intervals(
+      values = "Greens",           
+      style = "pretty"),
+    fill.legend = tm_legend(
+      title = "Act Uptake"
+    ),
     # hover settings 
     id = "hover_label",           
     popup.vars = c(               
       "State" = "ADM1_NAME", 
-      "Rate" = "prevalence",
-      "Lower CI" = "prevalence_low",
-      "Upper CI" = "prevalence_upp"
+      "Rate" = "act_coverage",
+      "Lower CI" = "act_coverage_low",
+      "Upper CI" = "act_coverage_upp"
     )
   )
 
-
+# ITN Ownership
 itn_data_polygons <- ghana_districts %>%
   left_join(district_estimates , by = "ADM2_NAME") %>%
   mutate(
@@ -170,19 +176,22 @@ itn_data_polygons <- ghana_districts %>%
     hover_label = paste0(ADM1_NAME, ": ", round(itn_coverage * 100, 1), "%")
   )
 
-itn_cov <- tm_shape(itn_data_polygons) +
+int_cov <- tm_shape(itn_data_polygons) +
   tm_polygons(
-    col = "prevalence",           
-    style = "pretty",
-    palette = "Purples", 
-    title = "ACT upatake",
+    fill = "itn_coverage",
+    fill.scale = tm_scale_intervals(
+      values = "Greens",           
+      style = "pretty"),
+    fill.legend = tm_legend(
+      title = "ITN Ownership"
+    ),
     # hover settings 
     id = "hover_label",           
     popup.vars = c(               
       "State" = "ADM1_NAME", 
-      "Rate" = "prevalence",
-      "Lower CI" = "prevalence_low",
-      "Upper CI" = "prevalence_upp"
+      "Rate" = "itn_coverage",
+      "Lower CI" = "itn_coverage_low",
+      "Upper CI" = "itn_coverage_upp"
     )
   )
 
