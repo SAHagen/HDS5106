@@ -6,3 +6,5 @@
 .quarto
 dhs_gh/
 glob_polygons/
+covariates/
+dhs_bf/

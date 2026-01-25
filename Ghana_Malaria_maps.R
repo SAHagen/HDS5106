@@ -109,7 +109,10 @@ district_estimates <- survey_design %>%
   group_by(ADM2_NAME) %>% 
     summarise(malaria_prevalence = survey_mean(outcome_binary, vartype = "ci", na.rm = TRUE),
               act_coverage = survey_mean(act_binary, vartype = "ci", na.rm = TRUE),
-              itn_coverage = survey_mean(itn_binary, vartype = "ci", na.rm = TRUE))
+              #itn_coverage = survey_mean(itn_binary, vartype = "ci", na.rm = TRUE),
+              n_obs = n(),
+              itn_coverage = survey_mean(itn_binary, vartype = c("ci", "se"), na.rm = TRUE)
+            )
 
 # joining the polygons with estimates fro ploting.
 map_data_polygons <- ghana_districts %>%
@@ -120,7 +123,7 @@ map_data_polygons <- ghana_districts %>%
   )
 
 
-tmap_mode("view")
+tmap_mode("plot")
 
 malaria_prev <- tm_shape(map_data_polygons) +
   tm_polygons(
@@ -139,12 +142,14 @@ malaria_prev <- tm_shape(map_data_polygons) +
       "Lower CI" = "malaria_prevalence_low", 
       "Upper CI" = "malaria_prevalence_upp"
     )
-  )
+  ) +
+  tm_compass(
+    type = "arrow", 
+    position = c("right", "top"), 
+    size = 2
+  ) +
+  tm_layout(frame = FALSE)
 
-<<<<<<< HEAD
-#Act uptake
-=======
->>>>>>> eae0daf985cd9da9fc4e8e1430d072f10acfb157
 act_data_polygons <- ghana_districts %>%
   left_join(district_estimates , by = "ADM2_NAME") %>%
   mutate(
@@ -169,7 +174,13 @@ act_cov <- tm_shape(act_data_polygons) +
       "Lower CI" = "act_coverage_low",
       "Upper CI" = "act_coverage_upp"
     )
-  )
+  ) +
+  tm_compass(
+    type = "arrow", 
+    position = c("right", "top"), 
+    size = 2
+  ) +
+  tm_layout(frame = FALSE)
 
 # ITN Ownership
 itn_data_polygons <- ghana_districts %>%
@@ -196,10 +207,61 @@ int_cov <- tm_shape(itn_data_polygons) +
       "Lower CI" = "itn_coverage_low",
       "Upper CI" = "itn_coverage_upp"
     )
-  )
+  )  +
+  tm_compass(
+    type = "arrow", 
+    position = c("right", "top"), 
+    size = 2
+  ) +
+  tm_layout(frame = FALSE)
 
 
 act_cov
-itn_cov
+int_cov
 malaria_prev
 
+
+
+
+
+ggplot(district_estimates, aes(x = n_obs, y = malaria_prevalence)) +
+  geom_point(alpha = 0.6, color = "#2c7fb8") +
+  geom_smooth(method = "loess", color = "red", se = FALSE, size = 0.5) +
+  geom_hline(yintercept = 0.1, linetype = "dashed", color = "gray50") +
+  annotate("text", x = max(district_estimates$n_obs, na.rm=TRUE), y = 0.105, 
+           label = "Unreliable Threshold", hjust = 1, size = 3) +
+  labs(
+    title = "High Uncertainty in Small Samples",
+    subtitle = "Standard Error increases drastically as sample size drops",
+    x = "Sample Size (Number of Children)",
+    y = "Standard Error (Uncertainty)"
+  ) +
+  theme_minimal()
+
+# ggplot(district_estimates, aes(x = n_obs, y = itn_coverage)) +
+#   geom_point(alpha = 0.6, color = "#2c7fb8") +
+#   geom_smooth(method = "loess", color = "red", se = FALSE, size = 0.5) +
+#   geom_hline(yintercept = 0.1, linetype = "dashed", color = "gray50") +
+#   annotate("text", x = max(district_estimates$n_obs, na.rm=TRUE), y = 0.105, 
+#            label = "Unreliable Threshold", hjust = 1, size = 3) +
+#   labs(
+#     title = "High Uncertainty in Small Samples",
+#     subtitle = "Standard Error increases drastically as sample size drops",
+#     x = "Sample Size (Number of Children)",
+#     y = "Standard Error (Uncertainty)"
+#   ) +
+#   theme_minimal()
+# 
+# ggplot(district_estimates, aes(x = n_obs, y = act_coverage)) +
+#   geom_point(alpha = 0.6, color = "#2c7fb8") +
+#   geom_smooth(method = "loess", color = "red", se = FALSE, size = 0.5) +
+#   geom_hline(yintercept = 0.1, linetype = "dashed", color = "gray50") +
+#   annotate("text", x = max(district_estimates$n_obs, na.rm=TRUE), y = 0.105, 
+#            label = "Unreliable Threshold", hjust = 1, size = 3) +
+#   labs(
+#     title = "High Uncertainty in Small Samples",
+#     subtitle = "Standard Error increases drastically as sample size drops",
+#     x = "Sample Size (Number of Children)",
+#     y = "Standard Error (Uncertainty)"
+#   ) +
+#   theme_minimal()
