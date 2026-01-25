@@ -141,7 +141,10 @@ malaria_prev <- tm_shape(map_data_polygons) +
     )
   )
 
+<<<<<<< HEAD
 #Act uptake
+=======
+>>>>>>> eae0daf985cd9da9fc4e8e1430d072f10acfb157
 act_data_polygons <- ghana_districts %>%
   left_join(district_estimates , by = "ADM2_NAME") %>%
   mutate(
