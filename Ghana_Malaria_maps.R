@@ -136,9 +136,6 @@ tm_shape(map_data_polygons) +
     )
   )
 
-
-
-
 act_data_polygons <- ghana_districts %>%
   left_join(district_estimates , by = "ADM2_NAME") %>%
   mutate(

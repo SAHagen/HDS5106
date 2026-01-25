@@ -1,8 +1,8 @@
 ---
 title: MSc Health Data Science Project Title
 author:
-  - name: Student A Name
-  - name: Student B Name
+  - name: Godwill Zulu
+  - name: Steward Hagan
     affil: 1
 affiliation:
   - num: 1
@@ -66,6 +66,10 @@ Malaria remains a critical public health challenge in West Africa, yet accurate 
 
 To overcome this data scarcity, this project employs the Fay-Herriot model, a standard Area-Level Small Area Estimation (SAE) method. This approach borrows strength from auxiliary data, such as census demographics and climate variables like rainfall and altitude, to generate smoothed, robust estimates of malaria burden and intervention coverage for every district. Beyond simple estimation, we leverage these robust values to investigate the causal effect of interventions, adjusting for confounding variables to model counterfactual scenarios and predict how different strategies could reduce the future malaria burden[^3].
 
+[^1]: Corsi, D. J., Neuman, M., Finlay, J. E., & Subramanian, S.. (2012). Demographic and health surveys: a profile. International Journal of Epidemiology, 41(6), 1602–1613. https://doi.org/10.1093/ije/dys184
+[^2]: Rao, Jnk, and Isabel Molina. Small Area Estimation /. Second. Hoboken, New Jersey : Wiley, 2015. Print.
+[^3]: Weiss, D. J., et al. (2019). "Mapping the global prevalence, incidence, and mortality of Plasmodium falciparum, 2000–17: a spatial and temporal modelling study." The Lancet 394(10195): 322–331.
+
 ## Objectives of Project
 
 1. To combine survey, census and climate data to make Small Area level estimates of malaria incidence, ACT uptake and ITN coverage in select west African countries using the Fay-Herriot model
@@ -75,8 +79,14 @@ To overcome this data scarcity, this project employs the Fay-Herriot model, a st
 3. To use the causal estimate to carry out projections based on different counter factual scenarios (e.g., if 80% of the people were sleeping under nets)
 
 # Data Sources and Datasets
+Primary Survey Data (DHS Program): Micro-data on malaria prevalence (RDT/microscopy) and intervention coverage (ACT uptake, ITN usage).
 
+Environmental Predictors (Malaria Atlas Project and DHS): High-resolution raster data including precipitation, mean temperature, altitude, and proximity to water bodies.
 
+Socio-Demographic Factors (HDX): Census-derived population density, poverty mapping, and urban/rural classifications.
+
+Spatial Structure (DHS & WHO):Household geolocations boundaries  from the DHS and official country and Administrative Level 2 (District) boundaries from the WHO Health Geographics hub.
+   
 
 <!-- This #### below causes the columns to break -->
 
@@ -88,53 +98,27 @@ To overcome this data scarcity, this project employs the Fay-Herriot model, a st
 
 
 
+# Early Results / Descriptive Statistics of Datasets
+
+
 #### 
 
 # Next Project Steps
 
-Data Integration & Processing
+Small Area Estimation: Smooth noisy direct estimates using a Poisson regression variant of the Fay-Herriot model in R. Compare model specifications for independent versus spatial random effects to account for neighboring district similarities.
 
-· Survey Data (DHS): Calculating direct weighted estimates for malaria prevalence (positive test results), ACT uptake, and ITN coverage at the Admin 2 (District) level.
+Causal Inference: Use the smoothed small area estimates to determine the causal effect of interventions on malaria burden, adjusting for confounding variables to isolate the true impact.
 
-· Climate Sources: Rainfall, average temperature, altitude, and proximity to water bodies (swamps).
-
-· Census/Socio-economic Sources: Poverty levels, urban/rural classification, and population density.
-
-Small Area Estimation (Objective 1)
-
-· Fay-Herriot Model: Using the Fay-Herriot (FH) model to smooth the noisy direct estimates from the DHS survey. Since we are dealing with rates/counts (cases
-
-per thousand), we will implement a Poisson regression variant of the Fay-Herriot model.
-
-· Random Effects: We will fit and compare two model specifications using the SAE package in R:
-
-1. Independent Random Effects: Assumes district-specific variations are unrelated.
-
-2. Spatial Random Effects: Accounts for the fact that neighboring districts likely have similar malaria rates.
-Causal Inference (Objective 2)
-
-· Causal Estimation: We will use the smoothed small area estimates (from Step 2) as the input variables. We will estimate the causal effect of interventions (ACT, ITN) on the malaria burden.
-
-· Confounder Adjustment: The model will adjust for confounding variables to isolate the true effect of the interventions.
-
-Counterfactual Projections (Objective 3)
-
-Static Scenario Modelling: We will perform counterfactual analysis i.e. using the causal coefficients estimated in Step 3 to predict what the malaria burden would be under different hypothetical scenarios (e.g., If ITN coverage were increased to 80%...).
-
-Visualization: We will produce maps comparing the Current Status vs. Projected Status to identify the most effective intervention strategy over a Shiny App.
-
-[^1]: Corsi, D. J., Neuman, M., Finlay, J. E., & Subramanian, S.. (2012). Demographic and health surveys: a profile. International Journal of Epidemiology, 41(6), 1602–1613. https://doi.org/10.1093/ije/dys184
-[^2]: Rao, Jnk, and Isabel Molina. Small Area Estimation /. Second. Hoboken, New Jersey : Wiley, 2015. Print.
-[^3]: Weiss, D. J., et al. (2019). "Mapping the global prevalence, incidence, and mortality of Plasmodium falciparum, 2000–17: a spatial and temporal modelling study." The Lancet 394(10195): 322–331.
-
+Counter factual Projections: Perform analysis to predict malaria burden under hypothetical scenarios (e.g., increasing ITN coverage to 80%) and develop an interactive Shiny App to visualize current versus projected outcomes.
 
 # GitHub
 
-The code and datasets for this project can be viewed at our GitHub repository here: <https://github.com/>
-
+The code and datasets for this project can be viewed at our GitHub repository here: <https://github.com/SAHagen/HDS5106>
 
 
 # References
+
+
 
 
 
