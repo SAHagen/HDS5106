@@ -1,5 +1,5 @@
 ---
-title: MSc Health Data Science Project Title
+title: SAE & Causal Analysis of Malaria Interventions in West Africa
 author:
   - name: Godwill Zulu
   - name: Stewart Hagen
@@ -17,8 +17,8 @@ primary_colour:	"#a80050"	# Secondary colour use for poster design.
 secondary_colour:	"#84003d"	# Main colour used for poster design.
 accent_colour:	"#e6007e"	# A third colour option.
 author_textcol: "white"
-title_textsize: "90pt"
-author_textsize: "60pt"
+title_textsize: "70pt"
+author_textsize: "50pt"
 body_textsize: "25pt"
 output: 
   posterdown::posterdown_html:
@@ -76,9 +76,9 @@ To combine survey, census and climate data to make Small Area level estimates of
 To use the estimate obtained from SAE to estimate the casual effects of malaria interventions (ACT, ITN, Medical treatment for fever) on small area level malaria burden while adjusting for confounding variables <br>
 <br>
 To use the causal estimate to carry out projections based on different counter factual scenarios (e.g., if 80% of the people were sleeping under nets)
-<br>
+
 <!-- it's acting quite odd here, see if you can fix it - there's an extra bit of space above the next line if I add the page break-->
-###
+
 
 # Data Sources and Datasets
 Primary Survey Data (DHS Program)
@@ -89,6 +89,32 @@ Socio-Demographic Factors (HDX): Census-derived population density, poverty mapp
 
 Spatial Structure (DHS & WHO):Household geolocations boundaries  from the DHS and official country and Administrative Level 2 (District) boundaries from the WHO Health Geographics hub.
 
+###
+
+# Descriptive Statistics of Datasets
+
+```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="SE vs Sample Size (Malaria Prevelance)"}
+knitr::include_graphics("malaria_prev_ghana.png")
+```
+
+While the map suggests low prevalence in many districts, the Reliability Plot below confirms these are artifacts of high error (CV > 30%) due to small sample sizes, necessitating SAE to 'borrow strength' and correct the estimates.
+
+```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="SE vs Sample Size (Malaria Prevelance)"}
+knitr::include_graphics("cv_prevelance.png")
+```
+
+The plot above shows why direct estimates fail. As sample size shrinks, the CV goes up, pushing most district estimates above the 30% reliability threshold. In these high noise districts, the SE is very large that the estimates become usable for policy making.
+
+
+```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="SE vs Sample Size (Malaria Prevelance)"}
+knitr::include_graphics("ghana_itn_map.png")
+```
+
+The same is true for the uptake of Artemisinin-based combination therapies. The map above suggests districts with greener shades have high uptake of ACT thus low prevalence of malaria. The plot below is trying to then give the reality of the direct estimates used in coming up with map above.
+
+```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="SE vs Sample Size (Malaria Prevelance)"}
+knitr::include_graphics("act_cv.png")
+```
 
 # Next Project Steps
 
@@ -100,21 +126,6 @@ Use the smoothed small area estimates to determine the causal effect of interven
 
 **Counter factual Projections**<br>
 Perform analysis to predict malaria burden under hypothetical scenarios (e.g., increasing ITN coverage to 80%) and develop an interactive Shiny App to visualize current versus projected outcomes.
-###
-
-# Early Results / Descriptive Statistics of Datasets
-This map shows direct malaria incidence rate estimates in Ghana at the second administration level. 
-![Caption: Malaria Prevelance Direct Estimates](malaria_prev_ghana.png)
-<!-- ![Caption: SE vs Sample Size (Malaria Prevelance)](se_malaria_prev.png) -->
-
-
-```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="SE vs Sample Size (Malaria Prevelance)"}
-knitr::include_graphics("se_malaria_prev.png")
-```
-
-This map shows the usage of Artemisinin based Coverage Treatment (ACT) in Ghana. 
-![Caption: ACT Coverage in Ghana](ghana_itn_map.png) 
-
 
 # GitHub
 

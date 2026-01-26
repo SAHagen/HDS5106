@@ -1,0 +1,170 @@
+---
+title: Small Area Estimation and Causal Analysis of Malaria Interventions in West Africa
+author:
+  - name: Student A Name
+  - name: Student B Name
+    affil: 1
+affiliation:
+  - num: 1
+    address: School of Mathematical and Statistical Sciences, University of Galway
+logoleft_name: https&#58;//sport.universityofgalway.ie/assets/img/logo2.png
+
+poster_height: "594mm"
+poster_width: "841mm"
+column_numbers: 4
+column_margins: "0.5in"	
+primary_colour:	"#a80050"	# Secondary colour use for poster design.
+secondary_colour:	"#84003d"	# Main colour used for poster design.
+accent_colour:	"#e6007e"	# A third colour option.
+author_textcol: "white"
+title_textsize: "90pt"
+author_textsize: "60pt"
+body_textsize: "25pt"
+output: 
+  posterdown::posterdown_html:
+    self_contained: true
+    pandoc_args: --mathjax
+    number_sections: false
+knit: pagedown::chrome_print
+---
+
+```{css, echo=FALSE}
+div.logo_left{
+  width: 20%;
+}
+div.poster_title{
+  width: 80%;
+}
+.section h4 {
+    break-after: column;
+}
+div.footnotes {
+    font-size: 18pt;
+}
+```
+
+<!-- Don't change anything above, except the title and author names, unless you know what you are doing. -->
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      tidy = FALSE,
+                      message = FALSE,
+                      fig.align = 'center',
+                      out.width = "100%")
+options(knitr.table.format = "html") 
+# Load any additional libraries here
+library(tidyverse)
+library(plotly)
+library(kableExtra)
+```
+
+# Background and Problem
+
+This template has been produced using the `posterdown` package. It generates a standard conference-style poster layout.
+
+<!-- You can add references by inserting the following ^[reference details here] -->
+
+A common problem in clinical research is messed up data[^1]. It can lead to bias or nonsensical results. Appropriate statistical analysis can result in superb findings in such cases, with the right assumptions.
+
+[^1]: Evans 2010, doi: 10.6030/1939-067x-3.1.1
+
+## Objectives of Project
+
+1.  Explain the statistical issue or research question in health data science to be investigated.
+2.  Explore a method of analysis.
+3.  Apply any methods to selected datasets.
+
+# Data Sources and Datasets
+
+The syntax in this poster template and the `posterdown` package uses the same workflow approach as the R Markdown you know and love.
+
+You can even use the bibliography the same way: Our data were taken from a cluster-randomised trial [^2], available from the [Irish Social Science Data Archive](https://www.ucd.ie/issda/data/).
+
+[^2]: Murphy et al. 2005 doi: 10.1186/1468-6708-6-11
+
+<!-- This #### below causes the columns to break -->
+
+<!-- You can change where you put these breaks, and the "column_numbers: 4" argument in the YAMLS header to change the layout of the poster, with care! -->
+
+#### 
+
+# Early Results / Descriptive Statistics of Datasets
+
+Usually you want to have a nice table displaying some important results that you have calculated. In `posterdown` this is as easy as using the `kable` table formatting you are probably use to as per typical R Markdown formatting.
+
+You can reference tables like so: Table \@ref(tab:mytable). Some basic summaries of the dataset are below:
+
+```{r mytable, out.width='80%'}
+knitr::kable(iris[1:10, 1:4], caption = 'Table caption.',align = 'c',"html") %>%
+  kable_styling(font_size = 20)
+```
+
+Figure \@ref(fig:standard-plot), and Figure \@ref(fig:morefigs) below show the patterns in our dataset. Make sure that all the details in your plots will be legible when printed (legend text, axis text, and any labels)
+
+```{r standard-plot, out.width='80%', fig.align='center', fig.cap='Great figure!', fig.height=4}
+ggplot(mpg, aes(displ, hwy, colour = class)) + 
+  geom_point()
+```
+
+```{r morefigs, out.width='80%', echo=FALSE, fig.cap='Amazing, right?!', fig.height=4}
+
+df1 <- data.frame(dose=c("D0.5", "D1", "D2"),
+                len=c(4.2, 10, 29.5))
+ggplot(df1, aes(x=dose, y=len, fill=dose)) +
+  geom_bar(stat="identity") +
+  theme_minimal()
+
+```
+
+You can even make your plots interactive for the HTML version of the poster. You can use the HTML poster for the presentation session, and the PDF poster will be printed - so be sure the static version looks okay.
+
+```{r interactiveplot, out.width='80%', echo=FALSE, fig.cap='Amazing, right?!', fig.height=4}
+
+gapminder <- read_csv("https://raw.githubusercontent.com/datavizpyr/data/master/gapminder-FiveYearData.csv")
+df2 <- gapminder %>%
+  filter(year %in% c(1952,2007)) %>%
+  filter(continent=="Asia") 
+
+df2 <- df2 %>%
+  mutate(paired = rep(1:(n()/2),each=2),
+         year=factor(year))
+
+p <- df2 %>% 
+  ggplot(aes(x= lifeExp, y= country)) +
+  geom_line(aes(group = paired)) +
+  geom_point(aes(color=year), size=4) +
+  theme_bw() +
+  theme(legend.position="top")
+
+
+ggplotly(p)
+
+```
+
+#### 
+
+# Next Project Steps
+
+We plan to conduct further analysis using:
+
+-   Variable discombobulation [^3]
+-   Expand our minds with explosive machine learning [^4].
+
+[^3]: Massey et al. 2005 doi: 15.36.413
+
+[^4]: Smith et al. 1991 doi: 12.36.486
+
+We will use the `plasticanalysis` package for this.
+
+
+# GitHub
+
+The code and datasets for this project can be viewed at our GitHub repository here: <https://github.com/>
+
+
+
+# References
+
+
+
