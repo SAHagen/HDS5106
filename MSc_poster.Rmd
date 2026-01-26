@@ -2,7 +2,7 @@
 title: MSc Health Data Science Project Title
 author:
   - name: Godwill Zulu
-  - name: Steward Hagan
+  - name: Stewart Hagen
     affil: 1
 affiliation:
   - num: 1
@@ -76,39 +76,19 @@ To combine survey, census and climate data to make Small Area level estimates of
 To use the estimate obtained from SAE to estimate the casual effects of malaria interventions (ACT, ITN, Medical treatment for fever) on small area level malaria burden while adjusting for confounding variables <br>
 <br>
 To use the causal estimate to carry out projections based on different counter factual scenarios (e.g., if 80% of the people were sleeping under nets)
+<br>
+<!-- it's acting quite odd here, see if you can fix it - there's an extra bit of space above the next line if I add the page break-->
+###
 
 # Data Sources and Datasets
-Primary Survey Data (DHS Program): Micro-data on malaria prevalence (RDT/microscopy) and intervention coverage (ACT uptake, ITN usage).
+Primary Survey Data (DHS Program)
 
 Environmental Predictors (Malaria Atlas Project and DHS): High-resolution raster data including precipitation, mean temperature, altitude, and proximity to water bodies.
 
 Socio-Demographic Factors (HDX): Census-derived population density, poverty mapping, and urban/rural classifications.
 
 Spatial Structure (DHS & WHO):Household geolocations boundaries  from the DHS and official country and Administrative Level 2 (District) boundaries from the WHO Health Geographics hub.
-   
 
-<!-- This #### below causes the columns to break -->
-
-<!-- You can change where you put these breaks, and the "column_numbers: 4" argument in the YAMLS header to change the layout of the poster, with care! -->
-# Data Description
-
-
-#### 
-
-
-
-# Early Results / Descriptive Statistics of Datasets
-
-![Caption: Malaria Prevelance Direct Estimates](malaria_prev_ghana.png)
-<!-- ![Caption: SE vs Sample Size (Malaria Prevelance)](se_malaria_prev.png) -->
-
-```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="SE vs Sample Size (Malaria Prevelance)"}
-knitr::include_graphics("se_malaria_prev.png")
-```
-
-![Caption: ACT Coverage in Ghana](ghana_itn_map.png) 
-
-#### 
 
 # Next Project Steps
 
@@ -120,6 +100,21 @@ Use the smoothed small area estimates to determine the causal effect of interven
 
 **Counter factual Projections**<br>
 Perform analysis to predict malaria burden under hypothetical scenarios (e.g., increasing ITN coverage to 80%) and develop an interactive Shiny App to visualize current versus projected outcomes.
+###
+
+# Early Results / Descriptive Statistics of Datasets
+This map shows direct malaria incidence rate estimates in Ghana at the second administration level. 
+![Caption: Malaria Prevelance Direct Estimates](malaria_prev_ghana.png)
+<!-- ![Caption: SE vs Sample Size (Malaria Prevelance)](se_malaria_prev.png) -->
+
+
+```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="SE vs Sample Size (Malaria Prevelance)"}
+knitr::include_graphics("se_malaria_prev.png")
+```
+
+This map shows the usage of Artemisinin based Coverage Treatment (ACT) in Ghana. 
+![Caption: ACT Coverage in Ghana](ghana_itn_map.png) 
+
 
 # GitHub
 
