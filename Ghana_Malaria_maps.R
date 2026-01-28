@@ -107,12 +107,28 @@ survey_design <- my_df %>%
 # calculating the district level estimates
 district_estimates <- survey_design %>%
   group_by(ADM2_NAME) %>% 
-    summarise(malaria_prevalence = survey_mean(outcome_binary, vartype = "ci", na.rm = TRUE),
-              act_coverage = survey_mean(act_binary, vartype = "ci", na.rm = TRUE),
+    summarise(malaria_prevalence = survey_mean(outcome_binary, vartype = c("ci", "se"), na.rm = TRUE),
+              act_coverage = survey_mean(act_binary, vartype = c("ci", "se"), na.rm = TRUE),
               #itn_coverage = survey_mean(itn_binary, vartype = "ci", na.rm = TRUE),
               n_obs = n(),
               itn_coverage = survey_mean(itn_binary, vartype = c("ci", "se"), na.rm = TRUE)
-            )
+            ) %>% 
+  mutate(
+    malaria_cv = malaria_prevalence_se / malaria_prevalence,
+    malaria_est_rel = case_when(
+      malaria_cv < 0.20 ~ "Highly Reliable",
+      malaria_cv >= 0.20 & malaria_cv < 0.30 ~ "Caution",
+      malaria_cv >= 0.30 ~ "Unreliable",
+      TRUE ~ "Undefined"
+    ),
+    act_uptake_cv = act_coverage_se / act_coverage,
+    act_est_rel = case_when(
+      act_uptake_cv < 0.20 ~ "Highly Reliable",
+      act_uptake_cv >= 0.20 & act_uptake_cv < 0.30 ~ "Caution",
+      act_uptake_cv >=  0.30 ~ "Unreliable",
+      TRUE ~ "undefined"
+    )
+  )
 
 # joining the polygons with estimates fro ploting.
 map_data_polygons <- ghana_districts %>%
@@ -238,19 +254,19 @@ ggplot(district_estimates, aes(x = n_obs, y = malaria_prevalence)) +
   ) +
   theme_minimal()
 
-# ggplot(district_estimates, aes(x = n_obs, y = itn_coverage)) +
-#   geom_point(alpha = 0.6, color = "#2c7fb8") +
-#   geom_smooth(method = "loess", color = "red", se = FALSE, size = 0.5) +
-#   geom_hline(yintercept = 0.1, linetype = "dashed", color = "gray50") +
-#   annotate("text", x = max(district_estimates$n_obs, na.rm=TRUE), y = 0.105, 
-#            label = "Unreliable Threshold", hjust = 1, size = 3) +
-#   labs(
-#     title = "High Uncertainty in Small Samples",
-#     subtitle = "Standard Error increases drastically as sample size drops",
-#     x = "Sample Size (Number of Children)",
-#     y = "Standard Error (Uncertainty)"
-#   ) +
-#   theme_minimal()
+ggplot(district_estimates, aes(x = n_obs, y = malaria_cv)) +
+  geom_point(aes(color = malaria_est_rel)) +
+  geom_hline(yintercept = 0.2, linetype = "dashed", size = 0.4 ,color = "green") +
+  geom_hline(yintercept = 0.3, linetype= "dashed", size = 0.4, color = "purple") +
+  annotate("text", x = max(district_estimates$n_obs, na.rm=TRUE), y = 0.105,
+           label = "Unreliable Threshold", hjust = 1, size = 3) +
+  labs(
+    title = "High Uncertainty in Small Samples",
+    subtitle = "Standard Error increases drastically as sample size drops",
+    x = "Sample Size (Number of Children)",
+    y = "Relative Standard Error (Uncertainty)"
+  ) +
+  theme_minimal()
 # 
 # ggplot(district_estimates, aes(x = n_obs, y = act_coverage)) +
 #   geom_point(alpha = 0.6, color = "#2c7fb8") +
