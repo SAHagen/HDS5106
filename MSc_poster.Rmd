@@ -61,24 +61,70 @@ library(pagedown)
 ```
 
 # Background and Problem
+Malaria remains a critical public health challenge in West Africa. While Demographic and Health Surveys (DHS) provide essential data on prevalence and intervention coverage, they are designed for national-level precision[^1]. When disaggregated to the district level, direct estimates suffer from small sample sizes, resulting in high standard errors that render them unreliable for local policy planning[^2].
 
-Malaria remains a public health challenge in West Africa, yet accurate data at the district level is often scarce. While Demographic and Health Surveys provide essential data on prevalence and intervention coverage, they are designed for national-level precision[^1]. When disaggregated to the district, these direct estimates rely on small sample sizes, resulting in noisy estimates with high variability[^2].
+
+Furthermore, attempting causal inference with area-level data risks the ecological fallacy, where associations observed at the group level may not reflect individual-level relationships[^3]. Before any robust causal analysis can be attempted, statistical stabilization through Small Area Estimation is required.
 
 [^1]: Corsi, D. J., Neuman, M., Finlay, J. E., & Subramanian, S.. (2012). Demographic and health surveys: a profile. International Journal of Epidemiology, 41(6), 1602–1613. https://doi.org/10.1093/ije/dys184
 [^2]: Rao, Jnk, and Isabel Molina. Small Area Estimation /. Second. Hoboken, New Jersey : Wiley, 2015. Print.
 [^3]: Weiss, D. J., et al. (2019). "Mapping the global prevalence, incidence, and mortality of Plasmodium falciparum, 2000–17: a spatial and temporal modelling study." The Lancet 394(10195): 322–331.
 
 ## Objectives of Project
-To combine survey, census and climate data to make Small Area level estimates of malaria incidence, ACT uptake and ITN coverage in select west African countries using the Fay-Herriot model. <br>
-<br>
-<br>
-To use the causal estimate to carry out projections based on different counter factual scenarios (e.g., if 80% of the people were sleeping under nets)
+Primary Aim:
+
+· To develop reliable district-level estimates of malaria burden and intervention coverage using Small Area Estimation methods.
+
+
+Sub Aims:
+
+· Calculate direct estimates of malaria prevalence and ACT/ITN coverage from DHS data, quantifying their reliability
+
+· Apply Fay-Herriot models to produce smoothed small area estimates
+
+· Compare independent vs. spatial random effects specifications
+
+· [Future] Investigate causal effects of interventions at small area level
 
 <!-- it's acting quite odd here, see if you can fix it - there's an extra bit of space above the next line if I add the page break-->
 
 # Methods 
 
-To overcome this data scarcity, we employ the Fay-Herriot model for small area Estimation. This approach borrows strength from auxiliary data, such as census demographics and climate variables to generate smoothed, robust estimates of malaria burden and intervention coverage for every district. Beyond estimation, we leverage these values to investigate the causal effect of interventions, adjusting for confounding variables to model counterfactual scenarios and project how different strategies could reduce the future malaria burden[^3].
+## A. Survey-Weighted Direct Estimation
+
+DHS uses complex survey design with stratification and clustering
+
+Weights account for unequal selection probabilities
+
+· Direct estimate formula: <!-- Add forumla here -->
+
+
+## B. Fay-Herriot Model
+
+
+Sampling Model:
+$$ \hat{\theta}_i | \theta_i \sim N(\theta_i, \psi_i^2)$$
+
+Linking Model (IID):
+
+$$\theta_i = x_i'\beta + u_i$$ where $u_i \sim N(0, \sigma_u^2)$
+
+Linking Model (Spatial):
+
+$$\theta_i = x_i'\beta + \phi_i$$ where $\phi$ follows ICAR prior
+
+## Reliability Criteria
+
+```{r table2, echo=FALSE, message=FALSE, warnings=FALSE, results='asis'}
+tabl <- "
+| CV Range        |Classification   |Interpretation  |
+|---------------|-------------|------|
+| CV < 20%  | Highly Reliable | Suitable for policy discussion |
+| 20% < CV < 30%  |Caution|Use only with appropriate caveats |
+| 30 ≤ CV | Unreliable|Shound not be used alone|
+"
+cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
+```
 
 # Data Sources and Datasets
 Primary Survey Data (DHS Program)
@@ -91,7 +137,9 @@ Spatial Structure (DHS & WHO):Household geolocations boundaries  from the DHS an
 
 ###
 
-# Descriptive Statistics of Datasets
+# Direct Estimates
+
+<!-- Add charts here -->
 
 ```{r, echo=FALSE, out.width="103%", fig.align="center", fig.cap="Malaria Prevelance Ghana"}
 knitr::include_graphics("malaria_prev_ghana.png")
