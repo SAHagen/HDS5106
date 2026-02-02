@@ -8,3 +8,8 @@ dhs_gh/
 glob_polygons/
 covariates/
 dhs_bf/
+Act.html
+.RDataTmp4
+stan_model_results.RData
+*.RData
+.RDataTmp*
