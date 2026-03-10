@@ -13,3 +13,4 @@ Act.html
 stan_model_results.RData
 *.RData
 .RDataTmp*
+iid_null.rds
