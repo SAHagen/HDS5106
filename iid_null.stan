@@ -62,18 +62,54 @@ vector[C] eta = mu + sigma_u * u[district] + sigma_v * epsilon;
 y ~ binomial_logit(n, eta);
 }
 
+// generated quantities {
+//   
+//   vector[C] pi_c = inv_logit( # pi_c are the cluster level fitted prevelance 
+//     mu + sigma_u * u[district] + sigma_v * epsilon
+//   );
+//   
+// # vector pi_ci is the model's fitted probability of malaria for each cluster — the posterior estimate of true prevalence in cluster cc
+// #c after accounting for all parameters. (smootheed estimates)
+// 
+//   vector[D] pi_d = (A * pi_c) ./ district_counts; # pi_d is a vector of district level prevelence aggregated from the above cclutser level prevalance
+//   
+// 
+//   real pi_ghana = inv_logit(mu);
+// 
+//   vector[C] log_lik;
+//   for (c in 1:C) {
+//     log_lik[c] = binomial_logit_lpmf(y[c] | n[c],
+//                    mu + sigma_u * u[district[c]] + sigma_v * epsilon[c]);
+//   }
+// }
+
+
 generated quantities {
   vector[C] pi_c = inv_logit(
     mu + sigma_u * u[district] + sigma_v * epsilon
   );
 
-  vector[D] pi_d = (A * pi_c) ./ district_counts;
+  // district prevalence — only for sampled districts
+  vector[D] pi_d;
+  for (d in 1:D) {
+    if (district_counts[d] > 0) {
+      // sampled district — average over clusters
+      pi_d[d] = dot_product(A[d], pi_c) / district_counts[d];
+    } else {
+      // unsampled district — prior prediction only
+      // grand mean + district random effect, no cluster data
+      pi_d[d] = inv_logit(mu + sigma_u * u[d]);
+    }
+  }
 
   real pi_ghana = inv_logit(mu);
 
   vector[C] log_lik;
   for (c in 1:C) {
     log_lik[c] = binomial_logit_lpmf(y[c] | n[c],
-                   mu + sigma_u * u[district[c]] + sigma_v * epsilon[c]);
+                   mu + sigma_u * u[district[c]] 
+                   + sigma_v * epsilon[c]);
   }
 }
+
+

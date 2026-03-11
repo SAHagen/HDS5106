@@ -15,7 +15,7 @@ The random effects are independent across districts, there is no spatial structu
 
 # The Multilevel Fay Heroit Model
 
-##Sampling Model
+### Sampling Model
 
 The sampling model is similar for all models to be defined iin the subsequent sections as they all share the first layer. The smapling model describes how the data arise from the underlying true malaria risk
 
@@ -49,7 +49,7 @@ $\sigma_{v}$ within-district cluster variation. The scaling weight on the cluste
 
 Total variation from the multilevel IID is the explained by:
 
-$$Total Variation in \eta_{c} = \sigma_{u}^{2} + \sigma_{v}^{2}$$
+$$Total_Variation in \eta_{c} = \sigma_{u}^{2} + \sigma_{v}^{2}$$
 
 If $\sigma_{u}^{2}$ dominates: malaria is mostly a district-level story. Knowing which district you are in explains most of the risk. SAE is very effective.
 
