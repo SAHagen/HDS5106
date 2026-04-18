@@ -4,7 +4,15 @@
 .httr-oauth
 .DS_Store
 .quarto
-dhs_gh/
+dhs_gh_22/
+dhs_gh_14/
+dhs_ml_23/
+dhs_ml_18/
+dhs_ml_12/
+dhs_ci_21/
+dhs_ci_12/
+dhs_bf_21/
+dhs_bf_10/
 glob_polygons/
 covariates/
 dhs_bf/
