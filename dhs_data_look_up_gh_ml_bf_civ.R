@@ -1,6 +1,6 @@
-# data preperation for multi year dhs sae
+# data preparation for multi year dhs sae
 
-# Question?? Are there similar vairiables across the diffent countries and years
+# Question?? Are there similar variables across the different countries and years
 # checking for Mali, CIV and Burkina Faso and Ghana. If yes which are the tests recorded for each countries
 # This helps us decide whether to have the country on board for modelling or drop it
 library(haven)
@@ -106,5 +106,5 @@ check_civ <- function(pr_path, year) {
 check_civ("dhs_ci_21/CIPR81DT/CIPR81FL.DTA", 2021)
 
 
-# Mali has no Malaria results for the their latest dhs round and thetwo available have different test for both years
-# therefor cannot be used because of comarability purposes.
+# Mali has no Malaria results for their latest dhs round and the two available have different test for both years
+# therefor cannot be used because of comparability purposes.

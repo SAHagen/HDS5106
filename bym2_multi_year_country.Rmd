@@ -1,0 +1,343 @@
+---
+title: "dhs_multiyear_country_data"
+author: ""
+date: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# loading all require libraries
+library(tidyverse)
+library(haven)
+library(sf)
+library(geodata)
+library(survey)
+library(spdep)
+library(Matrix)
+library(INLA)
+library(cmdstanr)
+
+
+```
+
+# About the Data
+
+# Demographic and Health Surveys (DHS) Data
+
+The data for this project is sourced from the Demographic and Health Surveys (DHS) program, which provides comprehensive datasets on health and population indicators across various countries. The specific datasets used in this analysis include two different DHS rounds for the selected countries namely, Ghana, Burkina Faso and Cote d'Ivoire. The are two main files for each round: the household recode (HR) file and GPS data file. The HR files contain detailed information on household characteristics which includes Malaria Results, the outcome we want to estimate, while the GPS data files provide geospatial coordinates for the survey clusters.
+
+The datasets were obtained from the DHS Program's official website, which requires registration and approval for access. The data is typically provided in Stata (.dta) format, which can be easily imported into R using the `haven` package. The specific files used in this analysis are as follows: 
+
+- For Ghana: 
+  - DHS 2014: `GHPR72DT.dta` (Household Recode), `GHGE71FL.shp` (GPS data) 
+  - DHS 2022: 'GHPR8CDT.dta' (Household Recode), `GHGE8AFL.shp` (GPS data) 
+
+- For Burkina Faso:        
+ - DHS 2010: `BFPR62DT.dta` (Household Recode), `BFGE61FL.shp` (GPS data)
+ - DHS 2021: `BFPR81DT.dta` (Household Recode), `BFGE81FL.shp` (GPS data)
+
+-   For Cote d'Ivoire:
+  -   DHS 2012: `CIPR62DT.dta` (Household Recode), `CIGE61FL.shp` (GPS data)
+  -   DHS 2021: `CIPR81DT.dta` (Household Recode), `CIGE81FL.shp` (GPS data)
+
+# Auxiliary Data
+
+# Data loading and cleaning
+
+```{r data-loading, echo=TRUE}
+#Survey Index
+survey_index <- tribble(
+    ~country, ~iso, ~year, ~round_id, ~pr_path, ~gps_path,
+  "Ghana",  "GHA", 2014,  1L,
+  "dhs_gh_14/GHPR72DT/GHPR72FL.DTA", "dhs_gh_14/GHGE71FL/GHGE71FL.shp",
+  "Ghana",  "GHA", 2022,  2L,
+  "dhs_gh_22/GHPR8CDT/GHPR8CFL.DTA", "dhs_gh_22/GHGE8AFL/GHGE8AFL.shp",
+  "Burkina","BFA", 2010,  1L,
+    "dhs_bf_10/BFPR62DT/BFPR62FL.DTA", "dhs_bf_10/BFGE61FL/BFGE61FL.shp",
+    "Burkina","BFA", 2021,  2L,
+    "dhs_bf_21/BFPR81DT/BFPR81FL.DTA", "dhs_bf_21/BFGE81FL/BFGE81FL.shp",
+    "Cote d'Ivoire", "CIV", 2012, 1L,
+    "dhs_ci_12/CIPR62DT/CIPR62FL.DTA", "dhs_ci_12/CIGE61FL/CIGE61FL.shp",
+    "Cote d'Ivoire", "CIV", 2021, 2L,
+    "dhs_ci_21/CIPR81DT/CIPR81FL.DTA", "dhs_ci_21/CIGE81FL/CIGE81FL.shp"
+)
+```
+
+# District Boundaries for each country
+
+The district boundaries are obtained form the GADM database, which provides high-resolution administrative boundary data for all countries. The specific administrative level used in this analysis is level 2 for Ghana and Level 3 for Burkina Faso and Cote d'Ivoire, which corresponds to districts. The GADM data is typically provided in shapefile format, which can be easily imported into R using the `sf` package.
+
+```{r district-boundaries, echo=TRUE}
+# Load district boundaries for each country
+# we import the boundaries and transform them to the same coordinate reference system (CRS) as the GPS data (WGS 84, EPSG:4326). We also rename the relevant columns for consistency and add an ISO code column for easier merging with the survey data later on.
+load_districts <- function(iso) {  
+  if (iso == "GHA") {
+    gadm(country = iso, level = 2, path = "boundaries/") %>%
+      st_as_sf() %>%
+      st_transform(crs = 4326) %>%
+      rename(district_name = NAME_2, district_code = GID_2) %>%
+      mutate(iso = iso)
+  } else {
+    gadm(country = iso, level = 3, path = "boundaries/") %>%
+      st_as_sf() %>%
+      st_transform(crs = 4326) %>%
+      rename(district_name = NAME_3, district_code = GID_3) %>%
+      mutate(iso = iso)
+  }
+}
+
+districts_raw <- map(c("GHA", "BFA", "CIV"), load_districts)
+names(districts_raw) <- c("GHA", "BFA", "CIV")
+
+# Since we are using Stan to fit our models, Stan does not understand individual district names or codes rather it requires numeric identifiers for each district. To address this, we create a lookup table for each country that assigns a unique numeric identifier to each district. This is done by dropping the geometry from the spatial data frame, selecting the relevant columns (district name, district code, and ISO code), and then creating a new column `district_id` that assigns a unique number to each district based on its position in the ordered list of districts. We then merge this lookup table back with the original spatial data frame to ensure that the districts are ordered according to their numeric identifiers. THis will help in building the adjacency matrix for the spatial model and in mapping the posterior results back.
+
+district_lookups <- map(districts_raw, function(sf) {
+  sf %>%
+    st_drop_geometry() %>%
+    select(district_name, district_code, iso) %>%
+    distinct() %>%
+    arrange(district_name) %>%
+    mutate(district_id = row_number())
+})
+
+districts_ordered <- map2(districts_raw, district_lookups, function(sf, lkp) {
+  sf %>%
+    left_join(lkp, by = c("district_name", "district_code", "iso")) %>%
+    arrange(district_id)
+})
+
+# quick district count for each country
+map(district_lookups, nrow)
+# as expected, Ghana has 260 districts, Burkina Faso has 351 and Cote d'Ivoire has 113 districts. Because we now know these numbers, we can then know how many districts had clusters sampled and how many had no clusters sampled, which will be important for the spatial modeling step later on.
+```
+
+# The Household Member Record (PR) files
+
+The PR contain detailed information on household characteristics, including the malaria test results for children under five years old. It is also the one that has the malaria test results at household level from all eligilbe children present at the time of the survey, regardless of weather their mother was interview or not.
+
+Malaria infection was measured using microscopic examination of thick blood smears from children aged 6–59 months (hml32 in the DHS Household Member Recode). Microscopy was selected over rapid diagnostic testing (RDT, hml35) because it provides a cleaner measure of point prevalence, the proportion of children currently infected rather than recent infection including post-treatment antigenic persistence. Sample sizes for the two tests were nearly identical across surveys. The distinction between the two measurement approaches is discussed in detail by Florey (2014).
+
+Florey, L. (2014). Measures of Malaria Parasitemia Prevalence in National Surveys: Agreement between Rapid Diagnostic Testing and Microscopy. DHS Analytical Studies No. 43. Rockville, MD: ICF International.
+
+```{r pr-files, echo=TRUE}
+# a function that takes the path to a pr file, the gps path, iso , year , round id, distirct_ordered a and district look up as in the trebble defined above. loads both files at the same time and joins them based on cluster_id.
+
+load_pr <- function(pr_path, gps_path, iso, year, round_id, 
+districts_ordered, district_lookup) {
+
+    # loading GPS and joining to district boundaries from GADM
+    gps <- read_sf(gps_path) %>%
+        rename(cluster_id = DHSCLUST) %>%
+        st_transform(crs = 4326)
+
+    gps_joined <- st_join(gps, districts_ordered, join = st_nearest_feature) %>%
+        select(cluster_id, district_name, district_code) %>%
+        st_drop_geometry() %>%
+        left_join(district_lookup, by = c("district_name", "district_code")) %>%
+        select(cluster_id, district_id, district_name)
+
+    # loading PR file and joining to GPS data
+    pr <- read_dta(pr_path) %>%
+        rename_with(tolower) %>%
+        select(cluster_id = hv001, hh_id = hv002,
+        line_id = hvidx, weight_raw = hv005, stratum = hv023,
+        age_months = hc1, malaria_microscopy = hml32) %>%
+        filter(age_months < 60, malaria_microscopy %in% c(0, 1)) %>%
+        mutate(
+            weight= weight_raw / 1e6,
+            malaria = as.integer(malaria_microscopy),
+            cluster_id = as.integer(cluster_id),
+            stratum = as.integer(stratum),
+            country = iso,
+            year = year,
+            round_id = round_id
+        ) %>%
+            select(-weight_raw, -malaria_rdt) %>%
+        left_join(gps_joined, by = "cluster_id")
+}
+
+pr_list <- pmap(
+  survey_index,
+  function(country, iso, year, round_id, pr_path, gps_path) {
+    load_pr(
+      pr_path = pr_path,
+      gps_path = gps_path,
+      iso = iso,
+      year = year,
+      round_id  = round_id,
+      districts_ordered = districts_ordered[[iso]],
+      district_lookup = district_lookups[[iso]]
+    )
+  }
+)
+
+# The abve produces a list of 6 data frames one for each survey round. Each data frame contains the malaria test results for children under five years old, along with the corresponding cluster and district information. 
+```
+
+# Using Svy Desing to quickly get the national prevalence for each country
+
+Direct Weighted Esimates of National Prevalence
+
+National under-5 malaria prevalence is estimated using thedesign-based methods that account fo the DHS complex sampling design. The DHS uses a stratified two-stage sample in which clusters (enumeration areas) are first selected with probability proportional to size within the rural/urban strata, and then households are randomly selected within clusters [Croft et al., 2018]. Valid estimators then must account for the clustering and statification. For each survey the population-weighted prevalence is estimated using Hajek (1971) ratio estimator:
+
+$\hat{p}_{s}^{w} = \frac{\sum_{k\in S_{s}} d_{k}y_{k}}{\sum_{k\in S_{s}} d_{k}}$
+where:
+- $S_{s}$ is the set of sampled children aged 6-59 months in survey $s$, with a valid test result
+- $d_{k}$ is the sampling weight for child $k$, computed as $hv005/1000000$ following DHS convention [Rutstein & Rojas, 2006] and
+- $y_{k}$ is the malaria test result for child $k$ (1 if positive, 0 if negative).
+
+
+Croft, T. N., Marshall, A. M. J., & Allen, C. K. (2018). Guide to DHS Statistics. 
+  Rockville, Maryland, USA: ICF. https://dhsprogram.com/Data/Guide-to-DHS-Statistics/
+
+Rutstein, S. O., & Rojas, G. (2006). Guide to DHS Statistics. Calverton, Maryland: ORC Macro.
+
+```{r national-prevalence, echo=TRUE}
+national_prevalence <- map(pr_list, function(pr) {
+  design_national <- svydesign(
+    ids = ~cluster_id,
+    strata = ~stratum,
+    weights = ~weight,
+    data = pr,
+    nest = TRUE
+  )
+  est <- svymean(~malaria, design = design_national, na.rm = TRUE)
+  data.frame(
+    country = pr$country[1],
+    year = pr$year[1],
+    round_id = pr$round_id[1],
+    prev = as.numeric(est),
+    se = as.numeric(SE(est)))
+})
+
+print(national_prevalence)
+
+```
+
+The above code calcuates on the national prevelance and for model fitting we will need to calculate the prevelance at the district level, which we will do in the next step. We will also need to calculate the number of children tested and the number of positive cases at the district level, which will be used as the response variable in our spatial model.
+
+```{r district-level-prevalence, echo=TRUE}
+# creating a function
+get_direct_estimates <- function(pr) {  
+  # Setting up the survey design for this country's PR file as above
+  design_district <- svydesign(
+    ids = ~cluster_id, # clusters (enumeration areas)
+    strata = ~stratum, # urban/rural × region
+    weights = ~weight, # hv005 / 1,000,000
+    data = pr,
+    nest= TRUE # clusters nested within strata
+  )
+    # Computing weighted prevalence PER DISTRICT
+  svyby(
+    formula = ~malaria,  # the outcome
+    by = ~district_id,  # stratify by district
+    design= design_district, # object created above
+    FUN = svymean,  # use weighted mean
+    na.rm  = TRUE,
+    keep.var = TRUE   # also return SEs
+  ) %>%
+    # Renaming for clarity
+    rename(p_hat = malaria, se_p = se) %>%    
+    # Drop districts with pathological estimates
+    # (p = 0, p = 1, or zero SE as these would break the logit transform)
+    filter(!is.na(p_hat), !is.na(se_p), 
+           se_p > 0, p_hat > 0, p_hat < 1) %>%    
+    # Add metadata and compute logit-scale quantities for Fay-Herriot
+    mutate(
+      country = pr$country[1],
+      iso = pr$country[1],
+      year = pr$year[1],
+      round_id  = pr$round_id[1],
+      
+      # Bounding p away from 0 and 1 so the logit transform is finite
+      p_bounded = pmax(0.02, pmin(0.98, p_hat)),      
+      # Logit-transformed direct estimate this is y_i in our Fay-Herriot
+      y_i = log(p_bounded / (1 - p_bounded)),
+      
+      # Delta-method variance on the logit scale
+      # From Var(logit(p)) ≈ Var(p) / [p(1-p)]²
+      logit_var = se_p^2 / (pmax(0.02, p_hat)^2 * pmax(0.02, 1 - p_hat)^2),
+      
+      # SE on logit scale  this is psi_i in Fay-Herriot
+      # Floored at 0.1 to prevent degenerate likelihood
+      # Capped at 2.0 to prevent explosive uncertainty
+      psi_i = pmax(0.1, pmin(sqrt(logit_var), 2.0))
+    ) %>%
+    
+    filter(is.finite(y_i), is.finite(psi_i)) %>%
+    select(country, iso, year, round_id, district_id, y_i, psi_i)
+}
+
+```
+
+For numerical stability, we apply two bounds to the direct estimates. Prevalences are bounded away from 0 and 1 using the interval [0.02, 0.98] before the logit transformation, preventing infinite values in districts with very sparse data. Logit-scale standard errors $\psi_{i}$ are floored at 0.1 and capped at 2.0, preventing districts with anomalously small or large sampling variance from dominating or breaking the Fay-Herriot likelihood. These bounds follow the convention used in prior DHS-based small area estimation work [Wakefield et al., 2020; Wu et al., 2021].
+
+Wakefield, J., Okonek, T., & Pedersen, J. (2020). Small Area Estimation for Disease 
+  Prevalence Mapping. International Statistical Review, 88(2), 398–418. 
+  https://doi.org/10.1111/insr.12400
+
+Wu, Y., Li, Z. R., Mayala, B. K., Wang, H., Gao, P. A., Paige, J., Fuglstad, G-A., 
+  Moe, C., Godwin, J., Donohue, R. E., Janocha, B., Croft, T. N., & Wakefield, J. 
+  (2021). Spatial Modeling for Subnational Administrative Level 2 Small-Area 
+  Estimation. DHS Spatial Analysis Reports No. 21. Rockville, Maryland, USA: ICF.
+
+Full District by Round Panel Per COuntry
+
+```{r full-district-panel, echo=TRUE}
+build_panel <- function(country_iso, district_lookup, direct_est_all) {  
+  # Use country_iso throughout — avoids collision with iso column in joins
+  rounds <- direct_est_all %>%
+    filter(country == country_iso) %>%
+    distinct(year) %>%
+    arrange(year) %>%
+    mutate(round_id = row_number())
+  
+  cat(country_iso, "years found:", rounds$year, "\n")  # verify
+  
+  est_clean <- direct_est_all %>%
+    filter(country == country_iso) %>%
+    select(district_id, year, y_i, psi_i)
+  
+  panel <- expand_grid(
+    district_id = district_lookup$district_id,
+    year        = rounds$year
+  ) %>%
+    left_join(
+      district_lookup %>% select(district_id, district_name),
+      by = "district_id"
+    ) %>%
+    left_join(est_clean, by = c("district_id", "year")) %>%
+    left_join(rounds,    by = "year") %>%
+    arrange(year, district_id) %>%
+    mutate(
+      country  = country_iso,
+      observed = as.integer(!is.na(y_i))
+    )
+  
+  cat(country_iso, "— rows:", nrow(panel),
+      "| expected:", nrow(district_lookup) * nrow(rounds), "\n")
+  
+  panel %>%
+    group_by(year) %>%
+    summarise(
+      total        = n(),
+      n_observed   = sum(observed == 1),
+      n_unobserved = sum(observed == 0),
+      .groups      = "drop"
+    ) %>%
+    print()
+  
+  panel
+}
+
+# Update the map call to match new parameter name
+panels <- map(
+  c("GHA", "BFA", "CIV"),
+  ~build_panel(.x, district_lookups[[.x]], direct_est_all)
+)
+names(panels) <- c("GHA", "BFA", "CIV")
+
+
+```
