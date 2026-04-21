@@ -18,8 +18,11 @@ library(spdep)
 library(Matrix)
 library(INLA)
 library(cmdstanr)
+library(terra)
+library(exactextractr)
+library(geodata)
 
-
+ghana_tt <- st_read("dhs_gh_14/GHGE71FL/GHGE71FL.shp")
 ```
 
 # About the Data
@@ -154,7 +157,7 @@ districts_ordered, district_lookup) {
             year = year,
             round_id = round_id
         ) %>%
-            select(-weight_raw, -malaria_rdt) %>%
+            select(-weight_raw, -malaria_microscopy) %>%
         left_join(gps_joined, by = "cluster_id")
 }
 
@@ -270,6 +273,9 @@ get_direct_estimates <- function(pr) {
     select(country, iso, year, round_id, district_id, y_i, psi_i)
 }
 
+direct_est_list <- map(pr_list, get_direct_estimates)
+direct_est_all  <- bind_rows(direct_est_list)
+
 ```
 
 For numerical stability, we apply two bounds to the direct estimates. Prevalences are bounded away from 0 and 1 using the interval [0.02, 0.98] before the logit transformation, preventing infinite values in districts with very sparse data. Logit-scale standard errors $\psi_{i}$ are floored at 0.1 and capped at 2.0, preventing districts with anomalously small or large sampling variance from dominating or breaking the Fay-Herriot likelihood. These bounds follow the convention used in prior DHS-based small area estimation work [Wakefield et al., 2020; Wu et al., 2021].
@@ -286,7 +292,8 @@ Wu, Y., Li, Z. R., Mayala, B. K., Wang, H., Gao, P. A., Paige, J., Fuglstad, G-A
 Full District by Round Panel Per COuntry
 
 ```{r full-district-panel, echo=TRUE}
-build_panel <- function(country_iso, district_lookup, direct_est_all) {  
+build_panel <- function(country_iso, district_lookup, direct_est_all) {
+  
   # Use country_iso throughout — avoids collision with iso column in joins
   rounds <- direct_est_all %>%
     filter(country == country_iso) %>%
@@ -337,7 +344,330 @@ panels <- map(
   c("GHA", "BFA", "CIV"),
   ~build_panel(.x, district_lookups[[.x]], direct_est_all)
 )
+
 names(panels) <- c("GHA", "BFA", "CIV")
 
+```
+
+The above code, a balanced panel is created by taking the cartesian product of all districts and all survey years for each country. The direct estimates are then merged onto this panel, resulting in a data frame where each row corresponds to a specific district-year combination. An `observed` indicator is created to flag which rows have direct estimates (i.e., where `y_i` is not NA) and which do not. Coverage varied by country and round: 153/260 (59%) and 124/260 (48%) districts in Ghana (2014, 2022); 232/351 (66%) and 153/351 (44%) departments in Burkina Faso (2010, 2021); and 80/113 (71%) and 103/113 (91%) departments in Côte d'Ivoire (2012, 2021). The balanced panel is structural to the model: observed district-years contribute to the Fay-Herriot likelihood while unobserved ones receive posterior estimates through the BYM2 spatial prior and the shared temporal component [Rao & Molina, 2015; Wu et al., 2021].
+
+# Adjacency Matrix and Scaling factor
+
+For each country, district adjacency was defined using queen contiguity, where two districts are neighbours if they share any portion of their boundary [Bivand et al., 2013]. This produces a symmetric binary adjacency matrix $\mathbf{W}$ W from which the ICAR precision matrix is constructed as $Q_{ICAR}= D − W$ D is a diagonal matrix of neighbour counts [Besag et al., 1991].
+
+Because $Q_{ICAR}$​ is rank-deficient by one, the constant vector lies in its null space, the marginal variances of the ICAR depend on the graph structure and are not unit-scale. Following Riebler et al. (2016), we computed a scaling factor $s$ as the geometric mean of the ICAR marginal variances:
+
+$s = \exp\!\left(\frac{1}{N}\sum_{i=1}^{N} \log [\mathbf{Q}_{\text{ICAR}}^{-}]_{ii}\right)$
+
+where  $Q_{ICAR}^−$​ denotes the generalised inverse, approximated here by $(Q_{ICAR}+0.001I)^{−1}$ for numerical stability. Dividing the ICAR component by $\sqrt{s}$​ in the BYM2 parametrisation ensures that the spatial component has geometric-mean marginal variance of 1, matching the IID component and making the spatial fraction $\phi$ interpretable and comparable across countries with different graph structures. The resulting scaling factors were 4.36 for Ghana, 3.36 for Burkina Faso, and 9.30 for Côte d'Ivoire, reflecting differences in the number and connectivity of administrative units.
+
+
+```{r adjacency-matrix, echo=TRUE}
+compute_scaling_factor <- function(nb, D) {
+  
+  adj_mat <- nb2mat(nb, style = "B", zero.policy = TRUE)
+  Q_icar <- Diagonal(x = rowSums(adj_mat)) - as(adj_mat, "sparseMatrix")
+  
+  # Regularise to break rank deficiency
+  eps <- 0.001
+  Q_reg <- Q_icar + eps * Diagonal(D)
+  
+  # Diagonal of Q_reg^{-1} = marginal variances
+  Q_inv_diag <- diag(solve(Q_reg))
+  
+  # Geometric mean of marginal variances (Riebler et al. 2016)
+  exp(mean(log(Q_inv_diag)))
+}
+
+build_spatial <- function(iso, districts_ordered) {
+  
+  D <- nrow(districts_ordered)
+  nb <- poly2nb(districts_ordered, queen = TRUE)
+  
+  # Fix islands using small snap tolerance
+  if (sum(sapply(nb, length) == 0) > 0) {
+    cat(iso, "— islands detected; applying snap fix\n")
+    nb <- poly2nb(districts_ordered, queen = TRUE, snap = 0.1)
+  }
+  
+  adj_mat <- nb2mat(nb, style = "B", zero.policy = TRUE)
+  edges <- which(adj_mat == 1, arr.ind = TRUE) %>%
+    as.data.frame() %>%
+    filter(row < col)
+  
+  scaling_factor <- compute_scaling_factor(nb, D)
+  
+  cat(iso, "— districts:", D,
+      "| edges:", nrow(edges),
+      "| scaling factor:", round(scaling_factor, 4), "\n")
+  
+  list(
+    D  = D,
+    nb = nb,
+    node1 = edges$row,
+    node2 = edges$col,
+    N_edges = nrow(edges),
+    scaling_factor = scaling_factor
+  )
+}
+
+spatial <- map(
+  c("GHA", "BFA", "CIV"),
+  ~build_spatial(.x, districts_ordered[[.x]])
+)
+names(spatial) <- c("GHA", "BFA", "CIV")
+
+
+```
+
+
+```{r covariates, echo=TRUE}
+# COVARIATE PREPARATION — GHANA
+# match district names to GADM boundaries, standardise for modellin
+covariates_raw <- readxl::read_xlsx("covariates_ghana.xlsx") %>%
+  rename(
+    country = Country,
+    date = Date,
+    district_code = District,
+    district_name = `...4`,
+    elevation = Elevation,
+    rainfall = Rainfall,
+    pop_density  = PopDensity,
+    pop_density_u5 = PopDensityUnder5
+  ) %>%
+  select(district_code, district_name, elevation, rainfall, pop_density_u5)
+
+print(map_int(covariates_raw, ~sum(is.na(.x))))
+
+# HANDLE MISSING RAINFALL REGIONAL MEAN IMPUTATION
+covariates_clean <- covariates_raw %>%
+  mutate(
+    rainfall  = as.numeric(rainfall),
+    imputed_flag = is.na(rainfall),
+    region_code  = str_sub(district_code, 3, 4)
+  ) %>%
+  group_by(region_code) %>%
+  mutate(
+    rainfall = ifelse(is.na(rainfall), 
+                      mean(rainfall, na.rm = TRUE), 
+                      rainfall)
+  ) %>%
+  ungroup()
+
+# Regional breakdown of imputation
+covariates_clean %>%
+  group_by(region_code) %>%
+  summarise(
+    total  = n(),
+    imputed  = sum(imputed_flag),
+    pct = round(100 * imputed / total, 1),
+    .groups  = "drop"
+  ) %>%
+  print()
+
+# 3. NAME CLEANING — STRIP ADMIN SUFFIXES AND PUNCTUATION
+clean_name_strict <- function(x) {
+  x %>%
+    str_to_lower() %>%
+    str_replace_all("[[:punct:]]+\\s*$", "") %>%
+    str_replace_all("[-/]", " ") %>%
+    str_replace_all("[[:punct:]]", "") %>%
+    str_replace_all(
+      "\\s+(municipal|municipality|metropolitan|metropolis|assembly|district)\\s*$", 
+      ""
+    ) %>%
+    str_replace_all("\\s+", " ") %>%
+    str_squish()
+}
+
+covariates_clean <- covariates_clean %>%
+  mutate(name_clean = clean_name_strict(district_name))
+
+gadm_lookup <- district_lookups[["GHA"]] %>%
+  mutate(name_clean = clean_name_strict(district_name))
+
+# These districts have different names in the covariates file vs GADM due to
+# historical renaming, splitting, or word-order variation:
+#
+#   Covariate name        GADM name              Reasoning
+#   --------------------  --------------------   ------------------
+#   Assin Fosu            Assin Central          Renamed (2017)
+#   Awutu Senya           Awutu Senya West       Original district; GADM kept full name
+#   Akyem Mansa           Akyemansa              Spelling variation
+#   Asene Akroso Manso    Asene-Manso-Akroso     Word reordering
+#   Lower Manya           Lower Manya-Krobo      Abbreviation
+
+manual_crosswalk <- tribble(
+  ~cov_clean,              ~gadm_clean,
+  "assin fosu",            "assin central",
+  "awutu senya",           "awutu senya west",
+  "akyem mansa",           "akyemansa",
+  "asene akroso manso",    "asene manso akroso",
+  "lower manya",           "lower manya krobo"
+)
+
+covariates_clean <- covariates_clean %>%
+  left_join(manual_crosswalk, by = c("name_clean" = "cov_clean")) %>%
+  mutate(name_clean = coalesce(gadm_clean, name_clean)) %>%
+  select(-gadm_clean)
+
+# MATCH COVARIATES TO GADM DISTRICTS
+matches_final <- covariates_clean %>%
+  inner_join(gadm_lookup, by = "name_clean", suffix = c("_cov", "_gadm"))
+
+cat("\nMatched districts:", nrow(matches_final), "of 260\n")
+
+# Verify no remaining mismatches
+cov_unmatched  <- anti_join(covariates_clean, gadm_lookup, by = "name_clean")
+gadm_unmatched <- anti_join(gadm_lookup, covariates_clean, by = "name_clean")
+#cat("Unmatched covariate rows:", nrow(cov_unmatched), "\n")
+#cat("Unmatched GADM districts:", nrow(gadm_unmatched), "\n")
+
+# BUILDING FINAL COVARIATE TABLE INDEXED BY DISTRICT_ID
+covariates_gha <- matches_final %>%
+  select(
+    district_id,
+    elevation,
+    rainfall,
+    pop_density_u5,
+    imputed_flag
+  )
+
+cat("\nFinal covariate table:\n")
+summary(covariates_gha)
+
+#STANDARDISING FOR MODELLING
+covariates_gha_std <- covariates_gha %>%
+  mutate(across(
+    c(elevation, rainfall, pop_density_u5),
+    ~as.numeric(scale(.x)),
+    .names = "{.col}_std"
+  )) %>%
+  select(district_id, ends_with("_std"), imputed_flag)
+
+# Joining the covariates to the panel data for Ghana
+panels[["GHA"]] <- panels[["GHA"]] %>%
+  left_join(covariates_gha_std, by = "district_id")
+
+
+```
+
+#Building the model data list for Stan
+
+```{r model-data-list, echo=TRUE}
+build_stan_data <- function(iso, panels, spatial, 
+                            covar_cols = NULL) {
+
+  panel <- panels[[iso]]
+  sp <- spatial[[iso]]
+  obs_idx <- which(panel$observed == 1)
+
+  # Covariate matrix — only use columns that exist in the panel
+  if (!is.null(covar_cols)) {
+    available <- intersect(covar_cols, names(panel))
+    if (length(available) > 0) {
+      X <- as.matrix(panel[, available])
+      K <- ncol(X)
+    } else {
+      X <- matrix(0, nrow = nrow(panel), ncol = 0)
+      K <- 0L
+    }
+  } else {
+    X <- matrix(0, nrow = nrow(panel), ncol = 0)
+    K <- 0L
+  }
+
+  list(
+    N = sp$D,
+    T = 2L,
+    NT = nrow(panel),
+    N_obs = length(obs_idx),
+    obs_idx = obs_idx,
+    district = panel$district_id,
+    time = panel$round_id,
+    y = panel$y_i[obs_idx],
+    psi = panel$psi_i[obs_idx],
+    N_edges = sp$N_edges,
+    node1 = sp$node1,
+    node2 = sp$node2,
+    scaling_factor = sp$scaling_factor,
+    K = K,
+    X = X
+  )
+}
+
+#intialisng an empty list to hold the data for each country, which will be passed to Stan for model fitting. For Ghana, we include the covariates (elevation, rainfall, and under-5 population density) as these are available and have been processed. For Burkina Faso and Cote d'Ivoire, we currently set K = 0 and use an empty covariate matrix, as we do not have covariate data for those countries at this time. This structure allows us to easily extend the model to include covariates for the other countries in the future if such data becomes available.
+stan_data <- list()
+
+stan_data[["GHA"]] <- build_stan_data(
+  "GHA", panels, spatial,
+  covar_cols = c("elevation_std", "rainfall_std", "pop_density_u5_std")
+)
+
+# Burkina and CIV remain covariate-free for now (K = 0)
+stan_data[["BFA"]] <- build_stan_data("BFA", panels, spatial)
+stan_data[["CIV"]] <- build_stan_data("CIV", panels, spatial)
+
+# checking the structure of the data list for Ghana to ensure it has been built correctly and contains all the necessary components for model fitting. This includes verifying the number of districts, the number of observed district-year combinations, the dimensions of the covariate matrix, and the scaling factor for the spatial component.
+cat("Ghana Stan data:\n")
++ cat("  N (districts):     ", stan_data[["GHA"]]$N, "\n")
++ cat("  NT (rows):         ", stan_data[["GHA"]]$NT, "\n")
++ cat("  N_obs:             ", stan_data[["GHA"]]$N_obs, "\n")
++ cat("  N_edges:           ", stan_data[["GHA"]]$N_edges, "\n")
++ cat("  K (covariates):    ", stan_data[["GHA"]]$K, "\n")
++ cat("  X dimensions:      ", paste(dim(stan_data[["GHA"]]$X), collapse = " × "), "\n")
++ cat("  Scaling factor:    ", round(stan_data[["GHA"]]$scaling_factor, 3), "\n")
+
+```
+
+# Model Fitting
+
+## Model specification
+
+Following the Bayesian Fay-Herriot framework established by @wakefield2020 and extended by @wu2021 for DHS-based subnational estimation, we fit separate multilevel models for each country. The decision to fit country-specific models — rather than a single pooled model across Ghana, Burkina Faso, and Côte d'Ivoire — follows the established convention in DHS-based small area estimation [@wakefield2020; @wu2021] and is justified by structural differences in graph topology, transmission dynamics, and survey design across the three countries.
+
+For each country, logit-transformed direct estimates $y_{it}$ and their design-based sampling standard errors $\psi_{it}$ entered a Gaussian likelihood $y_{it} \mid \theta_{it} \sim \mathcal{N}(\theta_{it}, \psi_{it}^2)$ for observed district-years. The latent logit prevalence decomposed as
+
+$$
+\theta_{it} = \mu + b_i + \delta_t + \mathbf{x}_i^\top {\beta},
+$$
+
+where $b_i$ is a district-level random effect, $\delta_t$ captures national temporal change, and $\mathbf{x}_i$ contains standardised static covariates.
+
+The district effect used the BYM2 reparameterisation of @riebler2016,
+
+$$
+b_i = \sigma_b\!\left(\sqrt{1-\phi}\, v_i + \sqrt{\phi/s}\, u_i\right),
+$$
+
+which combines an IID component ($v_i \sim \mathcal{N}(0, 1)$) with a scaled intrinsic conditional autoregressive (ICAR) component ($\mathbf{u}$ with sum-to-zero constraint) through the mixing parameter $\phi \in (0, 1)$. The scaling factor $s$ was computed as the geometric mean of marginal variances under the unscaled ICAR prior [@riebler2016], rendering $\phi$ interpretable as the fraction of district variance that is spatially structured.
+
+For the temporal component with $T = 2$ survey rounds, a first-order random walk prior is rank-deficient by one (analogous to the ICAR) and equivalent, after reparameterisation, to a sum-to-zero constraint [@goicoa2018; @knorrheld2000]. We therefore used $\delta_1 = \alpha$, $\delta_2 = -\alpha$, which automatically satisfies the constraint and makes $2\alpha$ directly interpretable as the national logit-scale change between rounds.
+
+Priors followed PC-style recommendations: $\sigma_b \sim \text{Exp}(4.6)$ (approximating $P(\sigma_b > 1) = 0.01$), $\phi \sim \text{Beta}(3, 2)$, and $\mu \sim \mathcal{N}(-2, 1)$. For the three standardised covariates (elevation, rainfall, population density under 5) we used weakly informative priors $\beta_k \sim \mathcal{N}(0, 1)$. All models were fit in Stan [@stan2024] via the `cmdstanr` interface with 4 chains, 1500 warmup and 2000 sampling iterations, `adapt_delta = 0.99`, and `max_treedepth = 14`.
+
+
+```{r model-fitting, echo=TRUE}
+mod_st_cov <- cmdstan_model("fh_bym2_st_covar.stan")
+
+fit_gha_cov <- mod_st_cov$sample(
+  data = stan_data[["GHA"]],
+  chains = 4,
+  parallel_chains = 4,
+  iter_warmup = 1500,
+  iter_sampling = 2000,
+  adapt_delta = 0.99,
+  max_treedepth = 14,
+  seed = 123,
+  refresh = 500
+)
+
+# Diagnostics
+fit_gha_cov$diagnostic_summary()
+
+# Main parameters
+fit_gha_cov$print(c("mu", "alpha", "sigma_b", "phi",
+                    "delta_change", "p_round1", "p_round2",
+                    "beta[1]", "beta[2]", "beta[3]"))
 
 ```
