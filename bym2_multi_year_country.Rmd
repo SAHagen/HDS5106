@@ -53,6 +53,7 @@ The datasets were obtained from the DHS Program's official website, which requir
   - Ghana Census 2021
 - Precipitation
   - World Food Programme Climate Hazards Group InfraRed Precipitation satellite imagery
+  - The 3 month average was taken for each time point to account for the duration of the DHS and census data collection 
 - Travel Time 
   - Malaria Atlas Project
 
@@ -76,6 +77,8 @@ survey_index <- tribble(
     "dhs_ci_21/CIPR81DT/CIPR81FL.DTA", "dhs_ci_21/CIGE81FL/CIGE81FL.shp"
 )
 ```
+
+Elevation rasters did not fall along clean country boundaries, so multiple rasters were combined and trimmed for each of the countries involved. Raster data for elevation and travel time were pulled and averaged over district level for each country. Rainfall data was sorted for each district and the date corresponding with the end of the census or DHS survey was chosen. Missing districts were assigned NA values. Poverty data in Ghana only exists in the 2021 census, thus the poverty value takes on NA values in the 2010 census.
 
 # District Boundaries for each country
 
