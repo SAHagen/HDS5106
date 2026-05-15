@@ -46,6 +46,15 @@ The datasets were obtained from the DHS Program's official website, which requir
 
 # Auxiliary Data
 
+- Elevation
+  - Hydrologic Derivatives for Modeling and Analysis elevation raster
+- Population + Density, literacy, and poverty
+  - Ghana Census 2021
+- Precipitation
+  - World Food Programme Climate Hazards Group InfraRed Precipitation satellite imagery
+- Travel Time 
+  - Malaria Atlas Project
+
 # Data loading and cleaning
 
 ```{r data-loading, echo=TRUE}
