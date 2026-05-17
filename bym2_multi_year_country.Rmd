@@ -22,7 +22,6 @@ library(terra)
 library(exactextractr)
 library(geodata)
 
-ghana_tt <- st_read("dhs_gh_14/GHGE71FL/GHGE71FL.shp")
 ```
 
 # About the Data
@@ -84,6 +83,7 @@ Elevation rasters did not fall along clean country boundaries, so multiple raste
 
 The district boundaries are obtained form the GADM database, which provides high-resolution administrative boundary data for all countries. The specific administrative level used in this analysis is level 2 for Ghana and Level 3 for Burkina Faso and Cote d'Ivoire, which corresponds to districts. The GADM data is typically provided in shapefile format, which can be easily imported into R using the `sf` package.
 
+# code
 ```{r district-boundaries, echo=TRUE}
 # Load district boundaries for each country
 # we import the boundaries and transform them to the same coordinate reference system (CRS) as the GPS data (WGS 84, EPSG:4326). We also rename the relevant columns for consistency and add an ISO code column for easier merging with the survey data later on.
@@ -136,6 +136,7 @@ Malaria infection was measured using microscopic examination of thick blood smea
 
 Florey, L. (2014). Measures of Malaria Parasitemia Prevalence in National Surveys: Agreement between Rapid Diagnostic Testing and Microscopy. DHS Analytical Studies No. 43. Rockville, MD: ICF International.
 
+# code
 ```{r pr-files, echo=TRUE}
 # a function that takes the path to a pr file, the gps path, iso , year , round id, distirct_ordered a and district look up as in the trebble defined above. loads both files at the same time and joins them based on cluster_id.
 
@@ -197,7 +198,7 @@ Direct Weighted Esimates of National Prevalence
 
 National under-5 malaria prevalence is estimated using thedesign-based methods that account fo the DHS complex sampling design. The DHS uses a stratified two-stage sample in which clusters (enumeration areas) are first selected with probability proportional to size within the rural/urban strata, and then households are randomly selected within clusters [Croft et al., 2018]. Valid estimators then must account for the clustering and statification. For each survey the population-weighted prevalence is estimated using Hajek (1971) ratio estimator:
 
-$\hat{p}_{s}^{w} = \frac{\sum_{k\in S_{s}} d_{k}y_{k}}{\sum_{k\in S_{s}} d_{k}}$
+$$\hat{p}_{s}^{w} = \frac{\sum_{k\in S_{s}} d_{k}y_{k}}{\sum_{k\in S_{s}} d_{k}}$$
 where:
 - $S_{s}$ is the set of sampled children aged 6-59 months in survey $s$, with a valid test result
 - $d_{k}$ is the sampling weight for child $k$, computed as $hv005/1000000$ following DHS convention [Rutstein & Rojas, 2006] and
@@ -209,6 +210,7 @@ Croft, T. N., Marshall, A. M. J., & Allen, C. K. (2018). Guide to DHS Statistics
 
 Rutstein, S. O., & Rojas, G. (2006). Guide to DHS Statistics. Calverton, Maryland: ORC Macro.
 
+# code
 ```{r national-prevalence, echo=TRUE}
 national_prevalence <- map(pr_list, function(pr) {
   design_national <- svydesign(
@@ -288,6 +290,15 @@ get_direct_estimates <- function(pr) {
 direct_est_list <- map(pr_list, get_direct_estimates)
 direct_est_all  <- bind_rows(direct_est_list)
 
+direct_est_ghana22 <- direct_est_all %>%
+  filter(iso == "GHA", year == 2022)
+
+write.csv(direct_est_ghana22, file = "direct_est_ghana22.csv", row.names = FALSE)
+
+direct_est_ghana22 %>%
+  summarise(
+    n_districts = n())
+
 ```
 
 For numerical stability, we apply two bounds to the direct estimates. Prevalences are bounded away from 0 and 1 using the interval [0.02, 0.98] before the logit transformation, preventing infinite values in districts with very sparse data. Logit-scale standard errors $\psi_{i}$ are floored at 0.1 and capped at 2.0, preventing districts with anomalously small or large sampling variance from dominating or breaking the Fay-Herriot likelihood. These bounds follow the convention used in prior DHS-based small area estimation work [Wakefield et al., 2020; Wu et al., 2021].
@@ -317,7 +328,7 @@ build_panel <- function(country_iso, district_lookup, direct_est_all) {
   
   est_clean <- direct_est_all %>%
     filter(country == country_iso) %>%
-    select(district_id, year, y_i, psi_i)
+    select(district_id, year, y_i, psi_i) # we only need the logit prevalence and its standard error for the model, along with the district_id and year for merging onto the panel. We also filter to the specific country we are building the panel for.
   
   panel <- expand_grid(
     district_id = district_lookup$district_id,
@@ -432,7 +443,7 @@ names(spatial) <- c("GHA", "BFA", "CIV")
 
 ```
 
-
+<!--
 ```{r covariates, echo=TRUE}
 # COVARIATE PREPARATION — GHANA
 # match district names to GADM boundaries, standardise for modellin
@@ -561,13 +572,78 @@ covariates_gha_std <- covariates_gha %>%
 panels[["GHA"]] <- panels[["GHA"]] %>%
   left_join(covariates_gha_std, by = "district_id")
 
+```
+!-->
+
+```{r covariates pre, echo=TRUE}
+ ghana_cov_2022 <- read_csv("ghana_district_covariates_2022.csv") %>%
+  select(
+    district_code,
+    elev_mean,
+    precip_mean,
+    travel_time_mean,
+    poverty_H,
+    literacy_rate,
+    pop_density
+  ) %>%
+  mutate(
+    # Log-transform population density BEFORE standardising
+    log_pop_density = log(pop_density)
+  )
+
+# Standardise all covariates, using log version for pop density
+ghana_cov_2022_std <- ghana_cov_2022 %>%
+  mutate(
+    elevation_std       = as.numeric(scale(elev_mean)),
+    rainfall_std        = as.numeric(scale(precip_mean)),
+    travel_time_std     = as.numeric(scale(travel_time_mean)),
+    poverty_std         = as.numeric(scale(poverty_H)),
+    literacy_rate_std   = as.numeric(scale(literacy_rate)),
+    pop_density_std     = as.numeric(scale(log_pop_density))   # standardise the LOG
+  ) %>%
+  select(district_code, ends_with("_std"))
+
+write.csv(ghana_cov_2022_std, file = "ghana_cov_2022_std.csv", row.names = FALSE)
+
+ghana_cov_2022_std %>%
+  select(ends_with("_std")) %>%
+  cor() %>%
+  round(2) %>%
+  print()
+
+
 
 ```
+
+
+```{r covariates_join_2022, echo=TRUE}
+ghana_cov_2022_indexed <- district_lookups[["GHA"]] %>%
+  select(district_id, district_code, district_name) %>%
+  inner_join(ghana_cov_2022_std, by = "district_code")
+
+
+#joinging for Ghana 2022 panel
+panels[["GHA"]] <- panels[["GHA"]] %>%
+  left_join(ghana_cov_2022_indexed %>% 
+              select(district_id, ends_with("_std")), 
+            by = "district_id")
+
+ghanA_FILE <- panels[["GHA"]] %>%
+  filter(year == 2022) %>%
+  select(district_id, district_name, elevation_std, rainfall_std, travel_time_std,
+         poverty_std, literacy_rate_std, pop_density_std, observed, y_i, psi_i)
+
+#
+write.csv(ghanA_FILE, file = "ghanA_FILE.csv", row.names = FALSE)
+
+
+```
+
 
 #Building the model data list for Stan
 
 ```{r model-data-list, echo=TRUE}
-build_stan_data <- function(iso, panels, spatial, 
+build_stan_data_st <- function(iso, panels, spatial, 
                             covar_cols = NULL) {
 
   panel <- panels[[iso]]
@@ -608,27 +684,62 @@ build_stan_data <- function(iso, panels, spatial,
   )
 }
 
+build_stan_data_cs <- function(iso, panels, spatial, year, covar_cols = NULL, prior_only = 1L) {
+  
+  # Filter panel to the specific year
+  panel <- panels[[iso]] %>% filter(year == !!year)
+  sp <- spatial[[iso]]
+  obs_idx <- which(panel$observed == 1)
+  
+  # Covariate matrix
+  if (!is.null(covar_cols)) {
+    available <- intersect(covar_cols, names(panel))
+    if (length(available) > 0) {
+      X <- as.matrix(panel[, available])
+      K <- ncol(X)
+    } else {
+      X <- matrix(0, nrow = nrow(panel), ncol = 0)
+      K <- 0L
+    }
+  } else {
+    X <- matrix(0, nrow = nrow(panel), ncol = 0)
+    K <- 0L
+  }
+  
+  list(
+    N = sp$D,
+    N_obs = length(obs_idx),
+    obs_idx = obs_idx,
+    y = panel$y_i[obs_idx],
+    psi = panel$psi_i[obs_idx],
+    N_edges = sp$N_edges,
+    node1 = sp$node1,
+    node2 = sp$node2,
+    scaling_factor = sp$scaling_factor,
+    K = K,
+    X = X,
+    prior_only = prior_only
+  )
+}
+
 #intialisng an empty list to hold the data for each country, which will be passed to Stan for model fitting. For Ghana, we include the covariates (elevation, rainfall, and under-5 population density) as these are available and have been processed. For Burkina Faso and Cote d'Ivoire, we currently set K = 0 and use an empty covariate matrix, as we do not have covariate data for those countries at this time. This structure allows us to easily extend the model to include covariates for the other countries in the future if such data becomes available.
 stan_data <- list()
 
-stan_data[["GHA"]] <- build_stan_data(
-  "GHA", panels, spatial,
-  covar_cols = c("elevation_std", "rainfall_std", "pop_density_u5_std")
+stan_data[["GHA_CS_2022"]] <- build_stan_data_cs(
+  iso = "GHA",
+  panels = panels,
+  spatial = spatial,
+  year = 2022,
+  covar_cols = c("elevation_std", "rainfall_std", "travel_time_std",
+                 "poverty_std", "pop_density_std", "literacy_rate_std"),
+                 prior_only = 0L
 )
 
 # Burkina and CIV remain covariate-free for now (K = 0)
-stan_data[["BFA"]] <- build_stan_data("BFA", panels, spatial)
-stan_data[["CIV"]] <- build_stan_data("CIV", panels, spatial)
+#stan_data[["BFA"]] <- build_stan_data("BFA", panels, spatial)
+#stan_data[["CIV"]] <- build_stan_data("CIV", panels, spatial)
 
 # checking the structure of the data list for Ghana to ensure it has been built correctly and contains all the necessary components for model fitting. This includes verifying the number of districts, the number of observed district-year combinations, the dimensions of the covariate matrix, and the scaling factor for the spatial component.
-cat("Ghana Stan data:\n")
-+ cat("  N (districts):     ", stan_data[["GHA"]]$N, "\n")
-+ cat("  NT (rows):         ", stan_data[["GHA"]]$NT, "\n")
-+ cat("  N_obs:             ", stan_data[["GHA"]]$N_obs, "\n")
-+ cat("  N_edges:           ", stan_data[["GHA"]]$N_edges, "\n")
-+ cat("  K (covariates):    ", stan_data[["GHA"]]$K, "\n")
-+ cat("  X dimensions:      ", paste(dim(stan_data[["GHA"]]$X), collapse = " × "), "\n")
-+ cat("  Scaling factor:    ", round(stan_data[["GHA"]]$scaling_factor, 3), "\n")
 
 ```
 
@@ -658,28 +769,67 @@ For the temporal component with $T = 2$ survey rounds, a first-order random walk
 
 Priors followed PC-style recommendations: $\sigma_b \sim \text{Exp}(4.6)$ (approximating $P(\sigma_b > 1) = 0.01$), $\phi \sim \text{Beta}(3, 2)$, and $\mu \sim \mathcal{N}(-2, 1)$. For the three standardised covariates (elevation, rainfall, population density under 5) we used weakly informative priors $\beta_k \sim \mathcal{N}(0, 1)$. All models were fit in Stan [@stan2024] via the `cmdstanr` interface with 4 chains, 1500 warmup and 2000 sampling iterations, `adapt_delta = 0.99`, and `max_treedepth = 14`.
 
-
+# code
 ```{r model-fitting, echo=TRUE}
-mod_st_cov <- cmdstan_model("fh_bym2_st_covar.stan")
+mod_cs <- cmdstan_model("prior_predictive_checks.stan")
 
-fit_gha_cov <- mod_st_cov$sample(
-  data = stan_data[["GHA"]],
+fit_gha_cs <- mod_cs$sample(
+  data = stan_data[["GHA_CS_2022"]],
   chains = 4,
   parallel_chains = 4,
   iter_warmup = 1500,
   iter_sampling = 2000,
   adapt_delta = 0.99,
-  max_treedepth = 14,
   seed = 123,
   refresh = 500
 )
 
-# Diagnostics
-fit_gha_cov$diagnostic_summary()
+fit_gha_cs$diagnostic_summary()
 
-# Main parameters
-fit_gha_cov$print(c("mu", "alpha", "sigma_b", "phi",
-                    "delta_change", "p_round1", "p_round2",
-                    "beta[1]", "beta[2]", "beta[3]"))
+fit_gha_cs$print(c(
+  "mu", "sigma_b", "phi", "p_national",
+  "beta[1]", "beta[2]", "beta[3]", "beta[4]", "beta[5]", "beta[6]"
+))
+
+fit_gha_cs$cmdstan_diagnose()
+```
+
+```{r posterior predictive checks, echo=TRUE}
+# =============================================================================
+# 6. POSTERIOR PREDICTIVE CHECKS (after fitting the full model)
+# =============================================================================
+
+y_rep_post <- fit_gha_cs$draws("y_rep", format = "matrix")
+prev_post  <- fit_gha_cs$draws("prev", format = "matrix")
+# CHECK 1: Density overlay — does y_rep match y_obs?
+ppc_dens_overlay(y = stan_data$y, yrep = y_rep_post[1:100, ]) +
+   labs(title = "Posterior Predictive Check: y_rep vs Observed y")
+#
+# # CHECK 2: Mean
+ppc_stat(y = stan_data$y, yrep = y_rep_post, stat = "mean") +
+   labs(title = "PPC: Mean of y")
+#
+# # CHECK 3: Standard deviation
+ppc_stat(y = stan_data$y, yrep = y_rep_post, stat = "sd") +
+  labs(title = "PPC: SD of y")
+#
+# # CHECK 4: Intervals per district
+ppc_intervals(y = stan_data$y, yrep = y_rep_post,
+               x = 1:N, prob = 0.5, prob_outer = 0.95) +
+   labs(title = "PPC: Posterior Predictive Intervals by District",
+        x = "District", y = "Direct estimate (logit scale)")
+#
+# # CHECK 5: Posterior predictive p-values
+ppp <- colMeans(y_rep_post >= matrix(stan_data$y, nrow(y_rep_post), N, byrow = TRUE))
+hist(ppp, breaks = 30, main = "Posterior Predictive p-values",
+      xlab = "p-value", col = "steelblue")
+# # Should be roughly uniform. Pile-up near 0 or 1 = misfit.
+#
+# # CHECK 6: Residual spatial correlation
+resid_post <- colMeans(y_rep_post) - stan_data$y
+moran.test(resid_post, listw = nb2listw(nb))
+
+# # Significant Moran's I → model missing spatial signal
+
 
 ```
