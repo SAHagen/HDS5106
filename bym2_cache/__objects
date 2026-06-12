@@ -1,0 +1,66 @@
+fit-persistence-helpers	ensure_fit	is_fit_live	persist_fit	restore_fit
+district-boundaries	district_lookups	districts_ordered	districts_raw	load_districts
+survey-index	survey_index
+pr-files	load_pr	pr_list
+direct-estimates	direct_est_all	direct_est_list	get_direct_estimates
+build-panel	build_panel	panels
+adjacency-scaling	build_spatial	compute_scaling_factor	spatial
+load-covariates	covariates_panel
+join-covariates	join_covariates	panels
+correlation-heatmap	cor_matrix	covariate_cols
+direct-est-dist	
+adjacency-graph-plot	centroid_coords	centroids	edges_df	gha_with_id	sp
+build-stan-data-cs	build_stan_data_cs
+build-stan-data-st	build_stan_data_st
+assemble-stan-data	covar_cols	stan_data
+fit-iid	fit_iid	iid_code	mod_iid	sd_cs
+m1-iid-summary	
+fit-icar	fit_icar	icar_code	mod_icar
+m1-icar-summary	
+fit-cross-sectional	fit_gha_cs	mod_cs
+m1-bym2-summary	
+m1-bym2-keyparams	available	base_names	keep	key_bym2_params
+loo-cv	bym2_loo_code	fit_bym2_loo	fit_gha_cs	fit_icar	fit_iid	loo_bym2	loo_comp	loo_df	loo_icar	loo_iid	loo_list	mod_bym2_loo	p_loo	safe_loo
+model-comparison-maps	D_gha_cs	get_prev	gha_shp	maps_comp	model_prev	p_comp	prev_bym2_v	prev_icar_v	prev_iid_v
+ppc-cs	y_obs_cs	y_rep_cs
+cs-trace	
+fit-spacetime-all	fit_st	iso	mod_st
+m2-summaries	cc	safe_full_summary	safe_print
+m2-key-params	cc	key_st_params
+summary-across-countries	summary_all
+prior-post	p_delta	p_mu	p_phi	p_sigb	p_siggam	post_draws	prior_post_plot
+covariate-forest	beta_all	covar_labels	p_covars
+prevalence-maps	all_maps	make_prev_map_df
+trend-deviation-map	dev_limit	dev_summary_gha	map_dev
+top-deviation-districts	top_neg	top_pos
+uncertainty-maps	make_uncertainty_df	unc_r2
+observed-unobserved-map	make_obs_map	obs_maps	p_obs
+ci-comparison-obs-unobs	ci_all	make_ci_comparison	p_ci_box
+caterpillar-plot	ci_gha	p_cat
+direct-vs-smoothed	gha_direct	gha_model	gha_panel_r2	p_shrink	shrinkage_df
+st-diagnostics	
+unnamed-chunk-1	all_sf	bfa_sf	civ_sf	country_vec	cov_names	cross_border	D_all	D_bfa	D_civ	D_gha	edges	el	fit_pooled	gha_sf	i	j	K	mod_pooled	model_panel	N_obs	nb_all	nb_to_edgelist	NT	obs_idx	obs_mask	panel_pooled	Q	Q_scaled	remap_panel	scaling_factor_all	stan_data_pooled	within_country	X_pooled
+unnamed-chunk-2	beta_bar	beta_pooled	country_names	covar_labels	p_pooled_covars
+m3-pooled-summary	
+m3-pooled-key-params	key_pooled_params	safe_print
+m3-country-betas	cc	country_labels	cov_names_short	params	safe_print
+three-country-covariate-maps	country_borders	covar_map_df	full_panel	make_covar_map	p_all_covars	p_elev	p_ntl	p_pov	p_rain	p_temp	p_trav	panel_r2_cov
+nightlights-vs-prevalence	p_ntl_big	p_ntl_vs_prev	p_prev_big	pooled_map_df	pooled_prev_r2
+pooled-prevalence-map	p_pooled_map
+three-country-adjacency	centroids_all	coords_all	edges_all_df	n_cross	n_within	p_adj_3country
+pooled-cv-direct	cv_df	p_cv_direct
+pooled-cv-posterior	p_cv_pooled	pooled_full
+pooled-cv-comparison	cv_comparison	p_cv_comparison
+pooled-cv-rescue	rescue_df	rescued_districts	transition_matrix
+cv-reliability-scatter	p_cv_reliability	pooled_full
+pooled-cv-map	p_pooled_cv	pooled_cv_df	pooled_cv_map
+pooled-prevalence-draws	national_posteriors	p_national_post	prev_draws	prev_full
+r2-stan-write	
+r2-stan-data	
+r2-stan-fit	
+r2-vs-full-spatial	
+r2-vs-full-covariates	
+r2-vs-full-prevalence-r2	
+m4-r2-pooled-summary	
+m4-r2-pooled-key-params	
+m4-r2-country-betas	

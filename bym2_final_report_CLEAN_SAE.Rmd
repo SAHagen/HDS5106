@@ -1,0 +1,2760 @@
+---
+title: "Bayesian Small Area Estimation of Under-5 Malaria Prevalence in West Africa"
+author: ''
+date: "`r Sys.Date()`"
+output:
+  word_document:
+    toc: true
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+subtitle: "A Space-Time BYM2 Fay-Herriot Model Across Ghana, Burkina Faso, and Côte
+  d'Ivoire"
+bibliography: references.bib
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 9, fig.height = 6,
+                      cache       = TRUE,
+                      cache.path  = "bym2_cache/",
+                      cache.lazy  = FALSE,
+                      autodep     = TRUE)
+# Core libraries
+library(tidyverse)
+library(haven)
+library(sf)
+library(geodata)
+library(survey)
+library(spdep)
+library(Matrix)
+library(cmdstanr)
+library(bayesplot)
+library(tidybayes)
+library(patchwork)
+library(ggcorrplot)
+library(posterior)
+```
+
+```{r fit-persistence-helpers, include=FALSE}
+dir.create("output/fits",    showWarnings = FALSE, recursive = TRUE)
+dir.create("output/figures", showWarnings = FALSE, recursive = TRUE)
+
+persist_fit <- function(fit, name) {
+  path <- file.path("output/fits", paste0(name, ".rds"))
+  tryCatch(
+    fit$save_object(file = path),
+    error = function(e) message("Could not persist fit ", name, ": ", conditionMessage(e))
+  )
+  invisible(fit)
+}
+
+is_fit_live <- function(fit) {
+  if (is.null(fit)) return(FALSE)
+  files <- tryCatch(fit$output_files(), error = function(e) character())
+  length(files) > 0L && all(file.exists(files))
+}
+
+restore_fit <- function(name) {
+  path <- file.path("output/fits", paste0(name, ".rds"))
+  if (file.exists(path)) readRDS(path) else NULL
+}
+
+ensure_fit <- function(fit, name) {
+    if (is_fit_live(fit)) {
+    persist_fit(fit, name)
+    return(fit)
+  }
+  restored <- restore_fit(name)
+  if (!is.null(restored)) return(restored)
+  warning("Fit `", name, "` has no live CSVs and no saved .rds; ",
+          "subsequent calls may fail. Re-run the chunk that fits it.")
+  fit
+}
+```
+
+```{r param-summary-helper, include=FALSE}
+# ---------------------------------------------------------------------------
+# param_summary(): print a tidy posterior summary of MODEL-LEVEL parameters
+# only (hyperparameters, covariate effects, national prevalences, odds
+# ratios). Per-district vectors (theta, b, u, v, prevalence, gamma, ...) are
+# deliberately excluded so the tables stay short and readable.
+#
+# `keep` is matched against the *base* parameter name (the part before any
+# "["), so "beta" keeps beta[1], beta[1,1], etc. Anything whose base name is
+# not in `keep` is dropped.
+# ---------------------------------------------------------------------------
+DISTRICT_LEVEL <- c("theta", "b", "u", "u_raw", "v", "prevalence",
+                    "gamma", "gamma_raw", "gamma_star",
+                    "alpha_raw", "beta_raw", "log_lik", "y_rep", "lp__")
+
+param_summary <- function(fit, label = NULL,
+                          keep = c("mu", "sigma_b", "phi", "sigma_gamma",
+                                   "alpha", "delta", "delta_2", "delta2",
+                                   "beta", "beta_bar", "tau",
+                                   "p_national", "p_round1", "p_round2",
+                                   "odds_ratio"),
+                          digits = 2) {
+  if (!is.null(label)) cat("\n==================== ", label,
+                           " ====================\n", sep = "")
+  vars <- tryCatch(fit$metadata()$stan_variables, error = function(e) character())
+  keep_vars <- setdiff(intersect(keep, vars), DISTRICT_LEVEL)
+  if (length(keep_vars) == 0L) {
+    cat("  [no model-level parameters matched for this fit]\n")
+    return(invisible(NULL))
+  }
+  tab <- tryCatch(
+    fit$summary(variables = keep_vars,
+                "mean", "median", "sd",
+                q5 = ~ quantile(.x, 0.05, names = FALSE),
+                q95 = ~ quantile(.x, 0.95, names = FALSE),
+                "rhat", "ess_bulk"),
+    error = function(e) { cat("  [summary failed:", conditionMessage(e), "]\n"); NULL }
+  )
+  if (is.null(tab)) return(invisible(NULL))
+  print(tab, n = Inf)
+  invisible(tab)
+}
+```
+
+
+
+# Data {#sec:data}
+
+## About the Demographic and Health Surveys (DHS)
+
+The Demographic and Health Surveys are nationally representative household
+surveys using a stratified two-stage cluster sampling design. The first
+stage selects enumeration areas (clusters) within strata defined by
+region and urban/rural status; the second stage selects households within
+each cluster. Children aged 6--59 months are tested for malaria parasitaemia
+using a rapid diagnostic test (RDT) [@florey2014; @croft2018]. Cluster
+GPS coordinates are jittered by up to 5 km (urban) or 10 km (rural) for
+respondent confidentiality. The household member recode (PR) file
+contains the individual-level biomarker; the cluster GPS shapefile
+provides the spatial reference.
+
+## Surveys Used in This Study
+
+| Country | Round 1 | Round 2 |
+|---|---|---|
+| Burkina Faso | DHS 2010 | DHS/MIS 2021 |
+| Côte d'Ivoire | DHS 2011 | DHS/MIS 2021 |
+| Ghana | DHS 2014 | DHS 2022 |
+
+## District Boundaries
+
+```{r district-boundaries}
+load_districts <- function(iso) {
+  if (iso == "GHA") {
+    gadm(country = iso, level = 2, path = "boundaries/") %>%
+      st_as_sf() %>% st_transform(crs = 4326) %>%
+      rename(district_name = NAME_2, district_code = GID_2) %>%
+      mutate(iso = iso)
+  } else {
+    gadm(country = iso, level = 3, path = "boundaries/") %>%
+      st_as_sf() %>% st_transform(crs = 4326) %>%
+      rename(district_name = NAME_3, district_code = GID_3) %>%
+      mutate(iso = iso)
+  }
+}
+
+districts_raw <- list(
+  GHA = load_districts("GHA"),
+  BFA = load_districts("BFA"),
+  CIV = load_districts("CIV")
+)
+
+# Create numeric district lookups (Stan requires integer indices)
+district_lookups <- map(districts_raw, function(d) {
+  d %>% st_drop_geometry() %>%
+    select(district_name, district_code, iso) %>%
+    mutate(district_id = row_number())
+})
+
+# Districts ordered by district_id for adjacency matrix construction
+districts_ordered <- map2(districts_raw, district_lookups, function(d, lk) {
+  d %>% left_join(lk, by = c("district_name", "district_code", "iso")) %>%
+    arrange(district_id)
+})
+
+map_dfr(district_lookups, ~tibble(districts = nrow(.x)), .id = "iso")
+```
+
+## Survey Index and PR Files
+
+```{r survey-index}
+survey_index <- tribble(
+  ~country,        ~iso, ~year, ~round_id, ~pr_path, ~gps_path,
+  "Ghana",         "GHA", 2014, 1L,
+  "dhs_gh_14/GHPR72DT/GHPR72FL.DTA", "dhs_gh_14/GHGE71FL/GHGE71FL.shp",
+  "Ghana",         "GHA", 2022, 2L,
+  "dhs_gh_22/GHPR8CDT/GHPR8CFL.DTA", "dhs_gh_22/GHGE8AFL/GHGE8AFL.shp",
+  "Burkina",       "BFA", 2010, 1L,
+  "dhs_bf_10/BFPR62DT/BFPR62FL.DTA", "dhs_bf_10/BFGE61FL/BFGE61FL.shp",
+  "Burkina",       "BFA", 2021, 2L,
+  "dhs_bf_21/BFPR81DT/BFPR81FL.DTA", "dhs_bf_21/BFGE81FL/BFGE81FL.shp",
+  "Cote d'Ivoire", "CIV", 2012, 1L,
+  "dhs_ci_12/CIPR62DT/CIPR62FL.DTA", "dhs_ci_12/CIGE61FL/CIGE61FL.shp",
+  "Cote d'Ivoire", "CIV", 2021, 2L,
+  "dhs_ci_21/CIPR81DT/CIPR81FL.DTA", "dhs_ci_21/CIGE81FL/CIGE81FL.shp"
+)
+```
+
+```{r pr-files}
+load_pr <- function(pr_path, gps_path, iso, year, round_id,
+                    districts_ordered, district_lookup) {
+  gps <- read_sf(gps_path) %>%
+    rename(cluster_id = DHSCLUST) %>%
+    st_transform(crs = 4326)
+  
+  gps_joined <- st_join(gps, districts_ordered, join = st_nearest_feature) %>%
+    select(cluster_id, district_name, district_code) %>%
+    st_drop_geometry() %>%
+    left_join(district_lookup, by = c("district_name", "district_code")) %>%
+    select(cluster_id, district_id, district_name)
+  
+  pr <- read_dta(pr_path) %>%
+    rename_with(tolower) %>%
+    select(cluster_id = hv001, hh_id = hv002, line_id = hvidx,
+           weight_raw = hv005, stratum = hv023,
+           age_months = hc1, malaria = hml32) %>%
+    filter(age_months < 60, malaria %in% c(0, 1)) %>%
+    mutate(weight = weight_raw / 1e6,
+           malaria = as.integer(malaria),
+           cluster_id = as.integer(cluster_id),
+           stratum = as.integer(stratum),
+           country = iso, year = year, round_id = round_id) %>%
+    left_join(gps_joined, by = "cluster_id")
+  
+  pr
+}
+
+pr_list <- pmap(survey_index, function(country, iso, year, round_id, pr_path, gps_path) {
+  load_pr(pr_path, gps_path, iso, year, round_id,
+          districts_ordered[[iso]], district_lookups[[iso]])
+})
+
+```
+
+# Direct Estimation {#sec:direct}
+
+For each observed district $i$ at time $t$, the design-based prevalence
+is computed using the Hájek ratio estimator [@hajek1971],
+$$\hat{p}_{it}^{w} = \frac{\sum_k d_k \, z_k}{\sum_k d_k},$$
+where $z_k$ is the binary RDT outcome for child $k$ and $d_k$ is the
+DHS sampling weight. Design-based standard errors are obtained via
+Taylor-series linearisation [@binder1983] using the `survey` package
+[@lumley2010], respecting the stratified two-stage cluster design.
+
+For the Fay-Herriot likelihood [@wakefield2020], the prevalence is
+transformed to the logit scale and the delta method is applied to the
+SE:
+$$y_{it} = \mathrm{logit}(\hat{p}_{it}^{w}), \qquad
+\widehat{\mathrm{SE}}(y_{it}) =
+  \frac{\widehat{\mathrm{SE}}(\hat{p}_{it}^{w})}
+       {\hat{p}_{it}^{w}(1-\hat{p}_{it}^{w})}.$$
+For numerical stability, prevalences are bounded to $[0.02, 0.98]$ and
+logit-scale SEs to $[0.1, 2.0]$.
+
+```{r direct-estimates}
+get_direct_estimates <- function(pr) {
+  design <- svydesign(
+    ids = ~cluster_id, strata = ~stratum, weights = ~weight,
+    data = pr, nest = TRUE
+  )
+  svyby(formula = ~malaria, by = ~district_id, design = design,
+        FUN = svymean, na.rm = TRUE, keep.var = TRUE) %>%
+    rename(p_hat = malaria, se_p = se) %>%
+    filter(!is.na(p_hat), !is.na(se_p),
+           se_p > 0, p_hat > 0, p_hat < 1) %>%
+    mutate(
+      country   = pr$country[1],
+      iso       = pr$country[1],
+      year      = pr$year[1],
+      round_id  = pr$round_id[1],
+      p_bounded = pmax(0.02, pmin(0.98, p_hat)),
+      y_i       = log(p_bounded / (1 - p_bounded)),
+      logit_var = se_p^2 / (pmax(0.02, p_hat)^2 * pmax(0.02, 1 - p_hat)^2),
+      psi_i     = pmax(0.1, pmin(sqrt(logit_var), 2.0))
+    ) %>%
+    filter(is.finite(y_i), is.finite(psi_i)) %>%
+    select(country, iso, year, round_id, district_id, y_i, psi_i)
+}
+
+direct_est_list <- map(pr_list, get_direct_estimates)
+direct_est_all  <- bind_rows(direct_est_list)
+
+direct_est_all %>% count(country, year, name = "observed_districts")
+
+```
+
+# Panel Construction {#sec:panel}
+
+```{r build-panel}
+build_panel <- function(country_iso, district_lookup, direct_est_all) {
+  rounds <- direct_est_all %>%
+    filter(country == country_iso) %>%
+    distinct(year) %>% arrange(year) %>%
+    mutate(round_id = row_number())
+  
+  est_clean <- direct_est_all %>%
+    filter(country == country_iso) %>%
+    select(district_id, year, y_i, psi_i)
+  
+  expand_grid(
+    district_id = district_lookup$district_id,
+    year        = rounds$year
+  ) %>%
+    left_join(district_lookup %>% select(district_id, district_name, district_code),
+              by = "district_id") %>%
+    left_join(est_clean, by = c("district_id", "year")) %>%
+    left_join(rounds, by = "year") %>%
+    arrange(year, district_id) %>%
+    mutate(country = country_iso,
+           observed = as.integer(!is.na(y_i)))
+}
+
+panels <- map(c("GHA", "BFA", "CIV"),
+              ~build_panel(.x, district_lookups[[.x]], direct_est_all))
+names(panels) <- c("GHA", "BFA", "CIV")
+
+map_dfr(panels, function(p) {
+  p %>% group_by(year) %>%
+    summarise(total = n(), observed = sum(observed == 1),
+              pct = round(100 * observed / total, 1), .groups = "drop")
+}, .id = "country")
+```
+
+# Spatial Adjacency and BYM2 Scaling Factor {#sec:adjacency}
+
+District adjacency is defined via queen contiguity using the `spdep`
+package [@bivand2013]. Disconnected components are reconnected via a
+snap tolerance to ensure a proper ICAR prior [@freni2018]. The BYM2
+scaling factor $s$ [@riebler2016] makes the mixing parameter $\phi$
+interpretable as the proportion of structured variance regardless of
+graph topology.
+
+```{r adjacency-scaling}
+compute_scaling_factor <- function(nb, D) {
+  adj_mat <- nb2mat(nb, style = "B", zero.policy = TRUE)
+  Q_icar  <- Diagonal(x = rowSums(adj_mat)) - as(adj_mat, "sparseMatrix")
+  eps <- 0.001
+  Q_reg <- Q_icar + eps * Diagonal(D)
+  Q_inv_diag <- diag(solve(Q_reg))
+  exp(mean(log(Q_inv_diag)))
+}
+
+build_spatial <- function(iso, districts_ordered) {
+  D <- nrow(districts_ordered)
+  nb <- poly2nb(districts_ordered, queen = TRUE)
+  if (sum(sapply(nb, length) == 0) > 0) {
+    nb <- poly2nb(districts_ordered, queen = TRUE, snap = 0.1)
+  }
+  
+  adj_mat <- nb2mat(nb, style = "B", zero.policy = TRUE)
+  edges <- which(adj_mat == 1, arr.ind = TRUE) %>%
+    as.data.frame() %>%
+    filter(row < col)
+  
+  scaling_factor <- compute_scaling_factor(nb, D)
+  
+  list(D = D, nb = nb,
+       node1 = edges$row, node2 = edges$col,
+       N_edges = nrow(edges),
+       scaling_factor = scaling_factor)
+}
+
+spatial <- map(c("GHA", "BFA", "CIV"),
+               ~build_spatial(.x, districts_ordered[[.x]]))
+names(spatial) <- c("GHA", "BFA", "CIV")
+
+map_dfr(spatial, function(s) {
+  tibble(N = s$D, N_edges = s$N_edges, scaling_factor = round(s$scaling_factor, 3))
+}, .id = "country")
+```
+
+# Covariates: Harmonised Multi-Country Panel {#sec:covariates}
+
+Seven covariates are assembled at the district-round level: elevation
+(SRTM, population-weighted), rainfall (CHIRPS v2.0, Sep--Dec mean),
+nighttime lights (NASA Black Marble VIIRS) [@elvidge2014], temperature
+(CRU TS v4.09, Sep--Dec mean), travel time (Weiss/MAP 2020,
+population-weighted), log population density (WorldPop 2020), and
+multidimensional poverty (OPHI MPI / national census headcount). All
+covariates are standardised within country. Pairwise correlations are
+kept below 0.7 [@dormann2013].
+
+```{r load-covariates}
+covariates_panel <- read_csv("three_country_model_panel.csv") %>%
+  select(country, district_id, district_name, time, year, label,
+         elev_std, rainfall_std, ntl_std, temp_std,
+         travel_std, pop_dens_std, poverty_std)
+
+covariates_panel %>% count(country, time, name = "rows")
+```
+
+```{r join-covariates}
+join_covariates <- function(iso) {
+  panels[[iso]] %>%
+    left_join(
+      covariates_panel %>%
+        filter(country == iso) %>%
+        select(district_id, time,
+               elev_std, rainfall_std, ntl_std, temp_std,
+               travel_std, pop_dens_std, poverty_std),
+      by = c("district_id", "round_id" = "time")
+    )
+}
+
+panels <- list(
+  GHA = join_covariates("GHA"),
+  BFA = join_covariates("BFA"),
+  CIV = join_covariates("CIV")
+)
+
+# Verify covariates are present
+panels[["GHA"]] %>% select(district_id, year, ends_with("_std")) %>% head()
+```
+
+# Exploratory Data Analysis {#sec:eda}
+
+## Correlation Heatmap
+
+```{r correlation-heatmap, fig.height=7, fig.width=8}
+covariate_cols <- c("elev_std", "rainfall_std", "ntl_std", "temp_std",
+                    "travel_std", "pop_dens_std", "poverty_std")
+
+cor_matrix <- covariates_panel %>%
+  select(all_of(covariate_cols)) %>%
+  cor(use = "complete.obs")
+
+ggcorrplot(
+  cor_matrix,
+  type = "lower",
+  lab = TRUE, lab_size = 3.5,
+  colors = c("#2166ac", "white", "#b2182b"),
+  title = "Pairwise correlations among standardised covariates",
+  ggtheme = ggplot2::theme_minimal()
+) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Distribution of Direct Estimates
+
+```{r direct-est-dist}
+direct_est_all %>%
+  mutate(prevalence = plogis(y_i)) %>%
+  ggplot(aes(x = factor(year), y = prevalence)) +
+  geom_violin(fill = "steelblue", alpha = 0.4) +
+  geom_jitter(width = 0.1, alpha = 0.4, size = 0.5) +
+  facet_wrap(~country, scales = "free_x") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(x = NULL, y = "Direct prevalence estimate (district)",
+       title = "Distribution of district-level direct estimates by country and round",
+       subtitle = "Each point is one district; violin shows the distribution") +
+  theme_minimal(base_size = 11)
+```
+
+## Adjacency Graph (Ghana)
+
+```{r adjacency-graph-plot, fig.height=8}
+gha_with_id <- districts_raw[["GHA"]] %>%
+  left_join(district_lookups[["GHA"]] %>% select(district_id, district_code),
+            by = "district_code") %>%
+  arrange(district_id)
+
+centroid_coords <- suppressWarnings(st_coordinates(st_centroid(gha_with_id)))
+centroids <- tibble(
+  district_id = gha_with_id$district_id,
+  x = centroid_coords[, "X"], y = centroid_coords[, "Y"]
+)
+
+sp <- spatial[["GHA"]]
+edges_df <- tibble(from_id = sp$node1, to_id = sp$node2) %>%
+  left_join(centroids %>% rename(x_from = x, y_from = y),
+            by = c("from_id" = "district_id")) %>%
+  left_join(centroids %>% rename(x_to = x, y_to = y),
+            by = c("to_id" = "district_id"))
+
+ggplot() +
+  geom_sf(data = districts_raw[["GHA"]],
+          fill = "grey95", colour = "grey60", linewidth = 0.2) +
+  geom_segment(data = edges_df,
+               aes(x = x_from, y = y_from, xend = x_to, yend = y_to),
+               colour = "#b2182b", alpha = 0.55, linewidth = 0.3) +
+  geom_point(data = centroids, aes(x = x, y = y),
+             colour = "black", size = 0.6) +
+  labs(title = "District adjacency graph used for the ICAR prior, Ghana",
+       subtitle = paste(sp$D, "districts,", sp$N_edges, "edges (queen contiguity)")) +
+  theme_void(base_size = 11)
+```
+
+# Common Methodology {#sec:methodology}
+
+All four models in this work share a common methodological core: a
+Fay-Herriot area-level likelihood, a BYM2 spatial random effect, and
+a shared set of priors. Each subsequent model section gives only the
+specification elements unique to that model, then proceeds directly to
+fitting, results and diagnostics.
+
+## Fay-Herriot Likelihood
+
+$$y_{it} \sim \mathcal{N}(\theta_{it}, \psi_{it}^2),$$
+where $\theta_{it}$ is the latent logit prevalence and $\psi_{it}^2$
+is treated as known (Section \ref{sec:direct}).
+
+## BYM2 Spatial Random Effect
+
+The district-level spatial random effect is given by [@riebler2016]:
+$$b_i = \sigma_b \left(\sqrt{1-\phi}\, v_i + \sqrt{\phi/s}\, u_i\right),
+\qquad v_i \sim \mathcal{N}(0,1), \quad u_i \sim \mathrm{ICAR}(W),$$
+written in non-centred form to avoid funnel geometry in the posterior.
+$W$ is the adjacency matrix of the relevant graph; $s$ is the BYM2
+scaling factor; $\sigma_b$ is the marginal spatial SD; and
+$\phi \in (0,1)$ is the proportion of structured variance.
+
+## Shared Priors
+
+| Parameter | Prior | Rationale |
+|---|---|---|
+| $\mu$ | $\mathcal{N}(-1.85, 1)$ | Centred near logit of moderate prevalence |
+| $\sigma_b$ | $\mathrm{Exp}(4.6)$ | PC-style; $P(\sigma_b > 1) = 0.01$ [@simpson2017] |
+| $\phi$ | $\mathrm{Beta}(3, 2)$ | Mild preference for structured > IID |
+| $\beta_k$ | $\mathcal{N}(0, 1)$ | Weakly informative on standardised covariates |
+| $\sigma_\gamma$ | $\mathrm{Exp}(2)$ | PC-style on interaction SD (Models 2--3) |
+| $\tau_k$ | $\mathrm{Exp}(2)$ | PC-style on between-country SD (Models 3--4) |
+
+## Computation
+
+All models are fitted in Stan [@stan2024] via `cmdstanr`, using the
+No-U-Turn Sampler with non-centred parameterisations throughout. Four
+chains, 1500 warmup and 2000 sampling iterations each. Cross-sectional
+and country-level space-time models use `adapt_delta = 0.99` and
+`max_treedepth = 14`; pooled models use `adapt_delta = 0.97` and
+`max_treedepth = 13`. Convergence is assessed via $\hat{R}$
+[@vehtari2017], bulk/tail ESS, and trace/rank/pairs plots. Models are
+compared by approximate leave-one-out cross-validation [@vehtari2017]
+using the `loo` package.
+
+## Stan Data Builders
+
+```{r build-stan-data-cs}
+build_stan_data_cs <- function(iso, panels, spatial, year, covar_cols = NULL) {
+  panel <- panels[[iso]] %>% filter(year == !!year)
+  sp <- spatial[[iso]]
+  obs_idx <- which(panel$observed == 1)
+  
+  if (!is.null(covar_cols)) {
+    available <- intersect(covar_cols, names(panel))
+    X <- if (length(available) > 0) as.matrix(panel[, available]) else matrix(0, nrow(panel), 0)
+    K <- ncol(X)
+  } else {
+    X <- matrix(0, nrow(panel), 0)
+    K <- 0L
+  }
+  
+  list(N = sp$D, N_obs = length(obs_idx),
+       obs_idx = obs_idx,
+       y = panel$y_i[obs_idx], psi = panel$psi_i[obs_idx],
+       N_edges = sp$N_edges, node1 = sp$node1, node2 = sp$node2,
+       scaling_factor = sp$scaling_factor,
+       K = K, X = X)
+}
+```
+
+```{r build-stan-data-st}
+build_stan_data_st <- function(iso, panels, spatial, covar_cols = NULL) {
+  panel <- panels[[iso]]
+  sp <- spatial[[iso]]
+  obs_idx <- which(panel$observed == 1)
+  
+  if (!is.null(covar_cols)) {
+    available <- intersect(covar_cols, names(panel))
+    X <- if (length(available) > 0) as.matrix(panel[, available]) else matrix(0, nrow(panel), 0)
+    K <- ncol(X)
+  } else {
+    X <- matrix(0, nrow(panel), 0)
+    K <- 0L
+  }
+  
+  list(N = sp$D, T = 2L, NT = nrow(panel),
+       N_obs = length(obs_idx), obs_idx = obs_idx,
+       district = panel$district_id, time = panel$round_id,
+       y = panel$y_i[obs_idx], psi = panel$psi_i[obs_idx],
+       N_edges = sp$N_edges, node1 = sp$node1, node2 = sp$node2,
+       scaling_factor = sp$scaling_factor,
+       K = K, X = X)
+}
+```
+
+```{r assemble-stan-data}
+covar_cols <- c("elev_std", "rainfall_std", "ntl_std", "temp_std",
+                "travel_std", "pop_dens_std", "poverty_std")
+
+stan_data <- list()
+
+# Cross-sectional reference: Ghana 2022 only
+stan_data[["GHA_CS_2022"]] <- build_stan_data_cs(
+  "GHA", panels, spatial, year = 2022, covar_cols = covar_cols
+)
+
+# Space-time models for all three countries
+stan_data[["GHA_ST"]] <- build_stan_data_st("GHA", panels, spatial, covar_cols = covar_cols)
+stan_data[["BFA_ST"]] <- build_stan_data_st("BFA", panels, spatial, covar_cols = covar_cols)
+stan_data[["CIV_ST"]] <- build_stan_data_st("CIV", panels, spatial, covar_cols = covar_cols)
+
+map_dfr(stan_data, function(d) {
+  tibble(
+    N = d$N,
+    NT = ifelse(is.null(d$NT), d$N, d$NT),
+    N_obs = d$N_obs, K = d$K,
+    N_edges = d$N_edges,
+    scaling_factor = round(d$scaling_factor, 3)
+  )
+}, .id = "model")
+```
+
+# Model 1: Cross-Sectional Ghana Baseline {#sec:model1}
+
+## Specification
+
+For each Ghana district $i$ observed in Round 2,
+$$\theta_i = \mu + b_i + \mathbf{x}_i^\top \bm{\beta},$$
+with $b_i$ the BYM2 random effect on the Ghana-only adjacency graph.
+For comparison, we fit two alternatives that turn off one spatial
+component each: a pure IID model ($\phi = 0$) and a pure ICAR model
+($\phi = 1$).
+
+## Fitting: IID
+
+```{r fit-iid, cache=TRUE}
+iid_code <- '
+data {
+  int<lower=1> N;
+  int<lower=1> N_obs;
+  array[N_obs] int<lower=1, upper=N> obs_idx;
+  vector[N_obs] y;
+  vector<lower=0>[N_obs] psi;
+  int<lower=1> K;
+  matrix[N, K] X;
+}
+parameters {
+  real mu;
+  vector[N] v;
+  real<lower=0> sigma_b;
+  vector[K] beta;
+}
+transformed parameters {
+  vector[N] theta;
+  theta = mu + sigma_b * v + X * beta;
+}
+model {
+  mu ~ normal(-1.85, 1.0);
+  sigma_b ~ exponential(4.6);
+  beta ~ normal(0, 1);
+  v ~ std_normal();
+  y ~ normal(theta[obs_idx], psi);
+}
+generated quantities {
+  vector[N_obs] log_lik;
+  vector[N] prevalence;
+  for (i in 1:N_obs)
+    log_lik[i] = normal_lpdf(y[i] | theta[obs_idx[i]], psi[i]);
+  for (i in 1:N)
+    prevalence[i] = inv_logit(theta[i]);
+}
+'
+writeLines(iid_code, "fh_iid.stan")
+mod_iid <- cmdstan_model("fh_iid.stan")
+
+sd_cs <- stan_data[["GHA_CS_2022"]]
+
+fit_iid <- mod_iid$sample(
+  data = sd_cs, chains = 4, parallel_chains = 4,
+  iter_warmup = 1000, iter_sampling = 1500,
+  adapt_delta = 0.95, max_treedepth = 12, refresh = 500
+)
+fit_iid$diagnostic_summary()
+
+fit_iid <- ensure_fit(fit_iid, "m1_iid")
+```
+
+## Model 1 (IID variant): parameters
+
+```{r m1-iid-summary}
+param_summary(fit_iid, "MODEL 1 — IID (Ghana 2022 cross-section)")
+```
+
+## Fitting: ICAR
+
+```{r fit-icar, cache=TRUE}
+icar_code <- '
+data {
+  int<lower=1> N;
+  int<lower=1> N_obs;
+  array[N_obs] int<lower=1, upper=N> obs_idx;
+  vector[N_obs] y;
+  vector<lower=0>[N_obs] psi;
+  int<lower=1> N_edges;
+  array[N_edges] int<lower=1, upper=N> node1;
+  array[N_edges] int<lower=1, upper=N> node2;
+  real<lower=0> scaling_factor;
+  int<lower=1> K;
+  matrix[N, K] X;
+}
+parameters {
+  real mu;
+  vector[N] u_raw;
+  real<lower=0> sigma_b;
+  vector[K] beta;
+}
+transformed parameters {
+  vector[N] theta;
+  vector[N] u = u_raw - mean(u_raw);
+  theta = mu + sigma_b * u / sqrt(scaling_factor) + X * beta;
+}
+model {
+  mu ~ normal(-1.85, 1.0);
+  sigma_b ~ exponential(4.6);
+  beta ~ normal(0, 1);
+  target += -0.5 * dot_self(u_raw[node1] - u_raw[node2]);
+  sum(u_raw) ~ normal(0, 0.001 * N);
+  y ~ normal(theta[obs_idx], psi);
+}
+generated quantities {
+  vector[N_obs] log_lik;
+  vector[N] prevalence;
+  for (i in 1:N_obs)
+    log_lik[i] = normal_lpdf(y[i] | theta[obs_idx[i]], psi[i]);
+  for (i in 1:N)
+    prevalence[i] = inv_logit(theta[i]);
+}
+'
+writeLines(icar_code, "fh_icar.stan")
+mod_icar <- cmdstan_model("fh_icar.stan")
+
+fit_icar <- mod_icar$sample(
+  data = sd_cs, chains = 4, parallel_chains = 4,
+  iter_warmup = 1000, iter_sampling = 1500,
+  adapt_delta = 0.95, max_treedepth = 12, refresh = 500
+)
+fit_icar$diagnostic_summary()
+
+
+fit_icar <- ensure_fit(fit_icar, "m1_icar")
+```
+
+## Model 1 (ICAR variant): parameters
+
+```{r m1-icar-summary}
+param_summary(fit_icar, "MODEL 1 — ICAR (Ghana 2022 cross-section)")
+```
+
+## Fitting: BYM2 (with log_lik for LOO)
+
+```{r fit-cross-sectional}
+mod_cs <- cmdstan_model("fh_bym2_cross_sectional.stan")
+
+fit_gha_cs <- mod_cs$sample(
+  data            = stan_data[["GHA_CS_2022"]],
+  chains          = 4,
+  parallel_chains = 4,
+  iter_warmup     = 1500,
+  iter_sampling   = 2000,
+  adapt_delta     = 0.99,
+  max_treedepth   = 14,
+  seed            = 123,
+  refresh         = 500
+)
+
+fit_gha_cs$diagnostic_summary()
+
+
+fit_gha_cs <- ensure_fit(fit_gha_cs, "m1_bym2_gha")
+
+fit_gha_cs$print(c(
+  "mu", "sigma_b", "phi", "p_national",
+  "beta[1]", "beta[2]", "beta[3]", "beta[4]",
+  "beta[5]", "beta[6]", "beta[7]"
+))
+```
+
+## Model 1 (BYM2): parameters
+
+```{r m1-bym2-keyparams}
+param_summary(fit_gha_cs, "MODEL 1 — BYM2 (Ghana 2022 cross-section)")
+```
+
+## LOO Model Comparison
+
+```{r loo-cv, fig.height=5, fig.width=9}
+library(loo)
+
+
+fit_iid     <- ensure_fit(fit_iid,    "m1_iid")
+fit_icar    <- ensure_fit(fit_icar,   "m1_icar")
+fit_gha_cs  <- ensure_fit(fit_gha_cs, "m1_bym2_gha")
+
+
+safe_loo <- function(fit, name) {
+  if (!("log_lik" %in% fit$metadata()$stan_variables)) {
+    message(name, ": no log_lik variable; skipping LOO.")
+    return(NULL)
+  }
+  tryCatch(
+    fit$loo(variables = "log_lik"),
+    error = function(e) {
+      message(name, " LOO failed: ", conditionMessage(e))
+      NULL
+    }
+  )
+}
+
+loo_iid  <- safe_loo(fit_iid,    "IID")
+loo_icar <- safe_loo(fit_icar,   "ICAR")
+loo_bym2 <- safe_loo(fit_gha_cs, "BYM2")
+
+
+if (is.null(loo_bym2)) {
+  message("Refitting BYM2 with log_lik for LOO comparison...")
+  bym2_loo_code <- "
+data {
+  int<lower=1> N;
+  int<lower=1> N_obs;
+  array[N_obs] int<lower=1, upper=N> obs_idx;
+  vector[N_obs] y;
+  vector<lower=0>[N_obs] psi;
+  int<lower=1> N_edges;
+  array[N_edges] int<lower=1, upper=N> node1;
+  array[N_edges] int<lower=1, upper=N> node2;
+  real<lower=0> scaling_factor;
+  int<lower=1> K;
+  matrix[N, K] X;
+}
+parameters {
+  real mu;
+  vector[N] v;
+  vector[N] u_raw;
+  real<lower=0> sigma_b;
+  real<lower=0, upper=1> phi;
+  vector[K] beta;
+}
+transformed parameters {
+  vector[N] theta;
+  vector[N] u = u_raw - mean(u_raw);
+  vector[N] b = sigma_b * (sqrt(1 - phi) * v + sqrt(phi / scaling_factor) * u);
+  theta = mu + b + X * beta;
+}
+model {
+  mu ~ normal(-1.85, 1.0);
+  sigma_b ~ exponential(4.6);
+  phi ~ beta(3, 2);
+  beta ~ normal(0, 1);
+  v ~ std_normal();
+  target += -0.5 * dot_self(u_raw[node1] - u_raw[node2]);
+  sum(u_raw) ~ normal(0, 0.001 * N);
+  y ~ normal(theta[obs_idx], psi);
+}
+generated quantities {
+  vector[N_obs] log_lik;
+  vector[N] prevalence;
+  for (i in 1:N_obs)
+    log_lik[i] = normal_lpdf(y[i] | theta[obs_idx[i]], psi[i]);
+  for (i in 1:N)
+    prevalence[i] = inv_logit(theta[i]);
+}
+"
+  writeLines(bym2_loo_code, "fh_bym2_loo.stan")
+  mod_bym2_loo <- cmdstan_model("fh_bym2_loo.stan")
+  fit_bym2_loo <- mod_bym2_loo$sample(
+    data = sd_cs, chains = 4, parallel_chains = 4,
+    iter_warmup = 1000, iter_sampling = 1500,
+    adapt_delta = 0.95, max_treedepth = 12, refresh = 500
+  )
+  fit_bym2_loo <- ensure_fit(fit_bym2_loo, "m1_bym2_loo")
+  loo_bym2 <- safe_loo(fit_bym2_loo, "BYM2 (refit)")
+}
+
+loo_list <- list(IID = loo_iid, ICAR = loo_icar, BYM2 = loo_bym2)
+loo_list <- Filter(Negate(is.null), loo_list)
+
+if (length(loo_list) >= 2L) {
+  loo_comp <- loo_compare(loo_list)
+  print(loo_comp, simplify = FALSE)
+
+  loo_df <- as_tibble(loo_comp, rownames = "Model")
+
+  p_loo <- loo_df %>%
+    mutate(Model = factor(Model, levels = rev(Model))) %>%
+    ggplot(aes(x = Model, y = elpd_diff)) +
+    geom_col(aes(fill = Model), width = 0.6, alpha = 0.8) +
+    geom_errorbar(aes(ymin = elpd_diff - 2 * se_diff,
+                       ymax = elpd_diff + 2 * se_diff), width = 0.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", colour = "grey40") +
+    scale_fill_manual(values = c("BYM2" = "#a80050", "ICAR" = "#2563eb", "IID" = "#f5a623")) +
+    coord_flip() +
+    labs(title    = "LOO-CV: IID vs ICAR vs BYM2 (Ghana 2022)",
+         subtitle = "Delta ELPD relative to best model (higher = better)",
+         x = NULL, y = "Delta ELPD") +
+    theme_minimal(base_size = 12) +
+    theme(legend.position = "none")
+
+  ggsave("output/figures/loo_cv_comparison.png", p_loo,
+         width = 9, height = 5, dpi = 300, bg = "white")
+  p_loo
+} else {
+  message("Fewer than two LOO objects available; skipping comparison plot.")
+}
+```
+
+## Maps: Direct vs IID vs ICAR vs BYM2
+
+```{r model-comparison-maps, fig.height=6, fig.width=14}
+# Extract prevalence from each model
+get_prev <- function(fit) {
+  s <- fit$summary("prevalence")
+  s$median
+}
+
+prev_iid_v  <- get_prev(fit_iid)
+prev_icar_v <- get_prev(fit_icar)
+
+
+if ("prevalence" %in% fit_gha_cs$metadata()$stan_variables) {
+  prev_bym2_v <- get_prev(fit_gha_cs)
+} else {
+  prev_bym2_v <- get_prev(fit_bym2_loo)
+}
+
+D_gha_cs <- stan_data[["GHA_CS_2022"]]$N
+
+model_prev <- bind_rows(
+  tibble(district_id = 1:D_gha_cs, prev = prev_iid_v[1:D_gha_cs], model = "IID"),
+  tibble(district_id = 1:D_gha_cs, prev = prev_icar_v[1:D_gha_cs], model = "ICAR"),
+  tibble(district_id = 1:D_gha_cs, prev = prev_bym2_v[1:D_gha_cs], model = "BYM2"),
+  panels[["GHA"]] %>% filter(round_id == 2) %>%
+    mutate(prev = ifelse(observed == 1, plogis(y_i), NA_real_), model = "Direct") %>%
+    select(district_id, prev, model)
+) %>%
+  mutate(model = factor(model, levels = c("Direct", "IID", "ICAR", "BYM2")))
+
+# Join to shapefile via district_id
+gha_shp <- districts_raw[["GHA"]] %>%
+  mutate(district_id = row_number())
+
+maps_comp <- map_dfr(levels(model_prev$model), function(m) {
+  gha_shp %>%
+    left_join(model_prev %>% filter(model == m), by = "district_id") %>%
+    mutate(model = m)
+}) %>%
+  mutate(model = factor(model, levels = c("Direct", "IID", "ICAR", "BYM2")))
+
+p_comp <- ggplot(maps_comp) +
+  geom_sf(aes(fill = prev), colour = "grey50", linewidth = 0.1) +
+  scale_fill_viridis_c(name = "Prevalence",
+                       labels = scales::percent_format(accuracy = 1),
+                       option = "magma", direction = -1,
+                       na.value = "grey80") +
+  facet_wrap(~model, nrow = 1) +
+  labs(title = "Model comparison: Direct vs IID vs ICAR vs BYM2 (Ghana 2022)",
+       subtitle = "Grey = unobserved in direct estimates. Spatial models fill all 260 districts.") +
+  theme_void(base_size = 11) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 12, face = "bold"))
+
+ggsave("output/figures/model_comparison_maps_ghana.png", p_comp, width = 14, height = 6, dpi = 300, bg = "white")
+p_comp
+```
+
+## Posterior Predictive Checks
+
+```{r ppc-cs}
+y_obs_cs <- stan_data[["GHA_CS_2022"]]$y
+y_rep_cs <- fit_gha_cs$draws("y_rep", format = "matrix")
+
+ppc_dens_overlay(y = y_obs_cs, yrep = y_rep_cs[1:100, ]) +
+  labs(title = "PPC: Density overlay (Ghana 2022 cross-sectional)")
+
+ppc_stat(y = y_obs_cs, yrep = y_rep_cs, stat = "mean") +
+  labs(title = "PPC: Mean of y")
+
+ppc_stat(y = y_obs_cs, yrep = y_rep_cs, stat = "sd") +
+  labs(title = "PPC: Standard deviation of y")
+```
+
+## Convergence Diagnostics
+
+```{r cs-trace}
+mcmc_trace(fit_gha_cs$draws(c("mu", "sigma_b", "phi")))
+```
+
+# Model 2: Country-Level Space-Time Models {#sec:model2}
+
+## Specification
+
+For each country $c$ fitted separately,
+$$\theta_{it} = \mu^{(c)} + b_i^{(c)} + \delta_t^{(c)} + \gamma_{it}^{(c)}
+              + \mathbf{x}_{it}^\top \bm{\beta}^{(c)},$$
+with $b_i^{(c)}$ the BYM2 effect on the country-specific graph and
+$\gamma_{it}^{(c)} \sim \mathcal{N}(0, \sigma_\gamma^2)$ the Knorr-Held
+Type I [@knorrheld2000] interaction. With $T=2$, Type I is the honest
+choice: structured temporal or space-time interactions are not
+identifiable [@goicoa2018].
+
+## Fitting: All Three Countries
+
+```{r fit-spacetime-all}
+mod_st <- cmdstan_model("fh_bym2_typeI.stan")
+
+fit_st <- list()
+
+for (iso in c("GHA", "BFA", "CIV")) {
+  cat("\n========== Fitting space-time model for", iso, "==========\n")
+  
+  fit_st[[iso]] <- mod_st$sample(
+    data            = stan_data[[paste0(iso, "_ST")]],
+    chains          = 4,
+    parallel_chains = 4,
+    iter_warmup     = 1500,
+    iter_sampling   = 2000,
+    adapt_delta     = 0.99,
+    max_treedepth   = 14,
+    seed            = 1729,
+    refresh         = 500
+  )
+  
+  cat("\nDiagnostics for", iso, ":\n")
+  print(fit_st[[iso]]$diagnostic_summary())
+  # Persist + restore draws so the fit survives across knit sessions
+  fit_st[[iso]] <- ensure_fit(fit_st[[iso]], paste0("m2_st_", iso))
+}
+```
+
+## Model 2: Country-level space-time parameters
+
+```{r m2-summaries}
+
+
+safe_print <- function(fit, params, label = NULL) {
+  if (!is.null(label)) cat("
+--- ", label, " ---
+", sep = "")
+  available <- fit$metadata()$stan_variables
+  base_names <- sub("\\[.*$", "", params)
+  keep <- params[base_names %in% available]
+  if (length(keep) == 0L) {
+    cat("  [none of the requested parameters exist in this fit]
+")
+    return(invisible(NULL))
+  }
+  tryCatch(fit$print(keep),
+           error = function(e) cat("  [print failed:", conditionMessage(e), "]
+"))
+}
+
+# Model-level parameters for each country (district-level effects excluded)
+for (cc in names(fit_st)) {
+  param_summary(fit_st[[cc]], paste0("MODEL 2 — ", cc, " (country-level space-time)"))
+}
+```
+
+```{r m2-key-params}
+# Key parameters across the three country-level space-time models
+key_st_params <- c(
+  "mu", "sigma_b", "phi", "sigma_gamma",
+  "delta2", "delta[2]",                       
+  "p_national[1]", "p_national[2]",
+  paste0("beta[", 1:7, "]")
+)
+
+for (cc in names(fit_st)) {
+  safe_print(fit_st[[cc]], key_st_params, label = cc)
+}
+```
+
+## Summary Across Countries
+
+```{r summary-across-countries}
+summary_all <- map_dfr(c("GHA", "BFA", "CIV"), function(iso) {
+  draws <- fit_st[[iso]]$draws(
+    variables = c("mu", "delta_2", "sigma_b", "phi", "sigma_gamma",
+                  "p_round1", "p_round2"),
+    format = "draws_matrix"
+  )
+  
+  tibble(
+    country  = iso,
+    variable = colnames(draws),
+    mean     = colMeans(draws),
+    median   = apply(draws, 2, median),
+    lower    = apply(draws, 2, quantile, 0.025),
+    upper    = apply(draws, 2, quantile, 0.975),
+    rhat     = apply(draws, 2, posterior::rhat),
+    ess_bulk = apply(draws, 2, posterior::ess_bulk)
+  )
+})
+
+print(n = 25, summary_all)
+
+# fit_st$print(c(
+#   "mu", "sigma_b", "phi", "p_national",
+#   "beta[1]", "beta[2]", "beta[3]", "beta[4]",
+#   "beta[5]", "beta[6]", "beta[7]"
+# ))
+```
+
+## Prior vs Posterior Comparison
+
+```{r prior-post}
+post_draws <- fit_st[["GHA"]]$draws(
+  c("mu", "delta_2", "sigma_b", "phi", "sigma_gamma"),
+  format = "draws_df"
+)
+
+prior_post_plot <- function(post_var, prior_fun, x_range, label) {
+  ggplot() +
+    geom_function(fun = prior_fun, xlim = x_range,
+                  aes(colour = "Prior"), linewidth = 0.9) +
+    geom_density(data = post_draws,
+                 aes(x = .data[[post_var]], colour = "Posterior"),
+                 linewidth = 0.9) +
+    scale_colour_manual(values = c(Prior = "grey50", Posterior = "#b2182b")) +
+    labs(x = label, y = "Density", colour = NULL) +
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "none")
+}
+
+p_mu     <- prior_post_plot("mu",          ~ dnorm(.x, -1.85, 1), c(-4, 0),  expression(mu))
+p_delta  <- prior_post_plot("delta_2",     ~ dnorm(.x, 0, 5),     c(-3, 3),  expression(delta[2]))
+p_sigb   <- prior_post_plot("sigma_b",     ~ dexp(.x, 4.6),       c(0, 2),   expression(sigma[b]))
+p_phi    <- prior_post_plot("phi",         ~ dbeta(.x, 3, 2),     c(0, 1),   expression(phi))
+p_siggam <- prior_post_plot("sigma_gamma", ~ dexp(.x, 2),         c(0, 2),   expression(sigma[gamma]))
+
+(p_mu | p_delta | p_sigb) / (p_phi | p_siggam | plot_spacer()) +
+  plot_annotation(title = "Prior vs posterior, space-time BYM2 model (Ghana)")
+```
+
+## Covariate Effects Across Countries (Country-Specific Models)
+
+```{r covariate-forest}
+covar_labels <- c("Elevation", "Rainfall", "Nighttime lights", "Temperature",
+                  "Travel time", "Pop. density (log)", "Poverty")
+
+
+beta_all <- summary_all %>%
+  # Filter only the rows where the variable starts with "beta["
+  filter(str_detect(variable, "^beta\\[")) %>%
+  mutate(
+    # Extract the numeric index from "beta[1]", "beta[2]", etc.
+    beta_idx = as.integer(str_extract(variable, "\\d+")),
+    
+    # Map the index to the correct human-readable label
+    covariate = covar_labels[beta_idx],
+    
+    # Calculate significance strictly using the lower/upper bounds in the table
+    # If both bounds are greater than 0, or both are less than 0, it is significant
+    is_significant = (lower > 0) | (upper < 0),
+    sig_marker = ifelse(is_significant, "*", "")
+  )
+
+# 3. Factor the covariates and countries to preserve plotting order
+beta_all$covariate <- factor(beta_all$covariate, levels = rev(covar_labels))
+beta_all$country <- factor(beta_all$country, levels = c("GHA", "BFA", "CIV"))
+
+# 4. Generate the plot
+p_covars <- ggplot(beta_all, aes(x = mean, y = covariate, colour = country, group = country)) +
+  
+  geom_pointrange(aes(xmin = lower, xmax = upper),
+                  position = position_dodge(width = 0.6), size = 0.8) +
+                  
+  # FIXED ALIGNMENT: Added hjust = 0 and locked the dodge with group = country
+  geom_text(aes(x = upper + 0.02, label = sig_marker),
+            position = position_dodge(width = 0.6),
+            size = 7,          # Slightly larger for visibility on a slide
+            vjust = 0.75,      # Pulls the top-heavy asterisk down to center it with the line
+            hjust = 0,         # Left-aligns it exactly 0.02 units away from the line
+            show.legend = FALSE, 
+            colour = "black") +
+            
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey40", linewidth = 0.8) +
+  scale_colour_brewer(palette = "Dark2", name = "Country") +
+  
+  scale_x_continuous(expand = expansion(mult = c(0.05, 0.15))) + 
+  
+  labs(x = "Coefficient (logit scale)", y = NULL,
+       title = "Covariate effects: Individual Space-Time Models",
+       subtitle = "Posterior mean and credible intervals. Asterisks (*) denote significant effects.") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("output/figures/individual_covariate_effects.png", p_covars, width = 10, height = 7, dpi = 300, bg = "white")
+p_covars
+```
+
+## Prevalence Maps: All Countries, Both Rounds
+
+```{r prevalence-maps, fig.height=12, fig.width=12}
+make_prev_map_df <- function(iso, round) {
+  prev_sum <- fit_st[[iso]]$summary("prevalence",
+    median = ~ median(.x),
+    lower  = ~ quantile(.x, 0.025),
+    upper  = ~ quantile(.x, 0.975)
+  ) %>%
+    mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>%
+    left_join(
+      panels[[iso]] %>% mutate(row_id = row_number()) %>%
+        select(row_id, district_id, round_id),
+      by = "row_id"
+    ) %>%
+    filter(round_id == round) %>%
+    left_join(district_lookups[[iso]] %>% select(district_id, district_code),
+              by = "district_id")
+  
+  districts_raw[[iso]] %>%
+    left_join(prev_sum, by = "district_code") %>%
+    mutate(country = iso, round_label = paste("Round", round))
+}
+
+all_maps <- map_dfr(c("GHA", "BFA", "CIV"),
+                    function(iso) bind_rows(
+                      make_prev_map_df(iso, 1),
+                      make_prev_map_df(iso, 2)
+                    ))
+
+ggplot(all_maps) +
+  geom_sf(aes(fill = median), colour = "grey40", linewidth = 0.1) +
+  scale_fill_viridis_c(name = "Prevalence",
+                       labels = scales::percent_format(accuracy = 1),
+                       option = "magma", direction = -1) +
+  facet_grid(country ~ round_label) +
+  labs(title = "Under-5 malaria prevalence across three West African countries",
+       subtitle = "Posterior medians from BYM2 space-time model") +
+  theme_void(base_size = 11) +
+  theme(legend.position = "right")
+```
+
+## District Trend Deviations
+
+```{r trend-deviation-map}
+dev_summary_gha <- fit_st[["GHA"]]$summary("gamma_star",
+  median = ~ median(.x),
+  lower  = ~ unname(quantile(.x, 0.025)),
+  upper  = ~ unname(quantile(.x, 0.975))
+) %>%
+  mutate(
+    district_id = as.integer(gsub("gamma_star\\[|\\]", "", variable)),
+    confident = (lower > 0) | (upper < 0)
+  ) %>%
+  left_join(district_lookups[["GHA"]] %>%
+              select(district_id, district_code, district_name),
+            by = "district_id")
+
+map_dev <- districts_raw[["GHA"]] %>%
+  left_join(dev_summary_gha, by = "district_code")
+
+dev_limit <- max(abs(range(map_dev$median, na.rm = TRUE)))
+
+ggplot(map_dev) +
+  geom_sf(aes(fill = median), colour = "grey40", linewidth = 0.1) +
+  scale_fill_gradient2(
+    name = expression(gamma[i]^"*"),
+    low = "#2166ac", mid = "white", high = "#b2182b",
+    midpoint = 0, limits = c(-dev_limit, dev_limit)
+  ) +
+  geom_sf(data = map_dev %>% filter(confident),
+          fill = NA, colour = "black", linewidth = 0.4) +
+  labs(
+    title = "District-level deviation from national malaria trend, Ghana 2014–2022",
+    subtitle = "Blue: faster decline than national. Red: slower / rising. Bold outline: 95% CI excludes 0."
+  ) +
+  theme_void(base_size = 11)
+```
+
+## Top Trend-Deviating Districts
+
+```{r top-deviation-districts}
+top_neg <- dev_summary_gha %>% arrange(median) %>% head(10) %>%
+  mutate(direction = "Faster decline")
+top_pos <- dev_summary_gha %>% arrange(desc(median)) %>% head(10) %>%
+  mutate(direction = "Slower / rising")
+
+bind_rows(top_neg, top_pos) %>%
+  mutate(district_name = fct_reorder(district_name, median)) %>%
+  ggplot(aes(x = median, y = district_name, colour = direction)) +
+  geom_pointrange(aes(xmin = lower, xmax = upper)) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_colour_manual(values = c("Faster decline" = "#2166ac",
+                                 "Slower / rising" = "#b2182b")) +
+  labs(x = expression(gamma[i]^"*" * " (logit scale)"), y = NULL,
+       title = "Top districts with credible deviation from national trend, Ghana",
+       colour = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom")
+```
+
+## Uncertainty Maps
+
+```{r uncertainty-maps, fig.height=5}
+make_uncertainty_df <- function(iso, round) {
+  unc <- fit_st[[iso]]$summary("prevalence",
+    width = ~ unname(quantile(.x, 0.975) - quantile(.x, 0.025))
+  ) %>%
+    mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>%
+    left_join(
+      panels[[iso]] %>% mutate(row_id = row_number()) %>%
+        select(row_id, district_id, round_id, observed),
+      by = "row_id"
+    ) %>%
+    filter(round_id == round) %>%
+    left_join(district_lookups[[iso]] %>% select(district_id, district_code),
+              by = "district_id")
+  
+  districts_raw[[iso]] %>%
+    left_join(unc, by = "district_code") %>%
+    mutate(country = iso)
+}
+
+unc_r2 <- map_dfr(c("GHA", "BFA", "CIV"),
+                  function(iso) make_uncertainty_df(iso, 2))
+
+ggplot(unc_r2) +
+  geom_sf(aes(fill = width), colour = "grey40", linewidth = 0.1) +
+  scale_fill_viridis_c(name = "95% CI width",
+                       labels = scales::percent_format(accuracy = 1),
+                       option = "cividis") +
+  facet_wrap(~country) +
+  labs(title = "Posterior uncertainty in Round 2 prevalence estimates",
+       subtitle = "Wider intervals = greater reliance on spatial smoothing (no direct data)") +
+  theme_void(base_size = 11)
+```
+
+## Observed vs Unobserved Districts
+
+```{r observed-unobserved-map, fig.height=10, fig.width=10}
+make_obs_map <- function(iso, round) {
+  panel_round <- panels[[iso]] %>% filter(round_id == round)
+  
+  obs_by_district <- panel_round %>%
+    select(district_id, observed) %>%
+    mutate(status = ifelse(observed == 1, "Observed", "Unobserved")) %>%
+    left_join(district_lookups[[iso]] %>% select(district_id, district_code),
+              by = "district_id")
+  
+  districts_raw[[iso]] %>%
+    left_join(obs_by_district, by = "district_code") %>%
+    mutate(country = iso,
+           round_label = paste("Round", round))
+}
+
+obs_maps <- map_dfr(c("GHA", "BFA", "CIV"),
+                    function(iso) bind_rows(
+                      make_obs_map(iso, 1),
+                      make_obs_map(iso, 2)
+                    ))
+
+p_obs <- ggplot(obs_maps) +
+  geom_sf(aes(fill = status), colour = "grey50", linewidth = 0.1) +
+  scale_fill_manual(
+    values = c("Observed" = "#2563eb", "Unobserved" = "#fbbf24"),
+    name = "Survey data"
+  ) +
+  facet_grid(country ~ round_label) +
+  labs(
+    title = "Districts with direct DHS data vs unobserved districts",
+    subtitle = "Unobserved districts rely entirely on spatial borrowing from neighbours and covariates"
+  ) +
+  theme_void(base_size = 11) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 11, face = "bold"))
+
+ggsave("output/figures/observed_vs_unobserved_map.png", p_obs, width = 10, height = 10, dpi = 300, bg = "white")
+p_obs
+```
+
+## Credible Interval Comparison: Observed vs Unobserved
+
+```{r ci-comparison-obs-unobs, fig.height=6, fig.width=10}
+make_ci_comparison <- function(iso, round) {
+  D <- stan_data[[paste0(iso, "_ST")]]$N
+  
+  # Use default summary (returns q5, q95, mean, median, sd, etc.)
+  prev_summary <- fit_st[[iso]]$summary("prevalence") %>%
+    mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>%
+    left_join(
+      panels[[iso]] %>% mutate(row_id = row_number()) %>%
+        select(row_id, district_id, round_id, observed),
+      by = "row_id"
+    ) %>%
+    filter(round_id == round) %>%
+    mutate(
+      ci_width = q95 - q5,
+      status = ifelse(observed == 1, "Observed", "Unobserved"),
+      country = iso
+    ) %>%
+    left_join(district_lookups[[iso]] %>% select(district_id, district_name),
+              by = "district_id")
+  
+  prev_summary
+}
+
+ci_all <- map_dfr(c("GHA", "BFA", "CIV"),
+                  function(iso) make_ci_comparison(iso, 2))
+
+# Boxplot comparing CI widths
+p_ci_box <- ggplot(ci_all, aes(x = status, y = ci_width, fill = status)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.8) +
+  facet_wrap(~country, scales = "free_y") +
+  scale_fill_manual(values = c("Observed" = "#2563eb", "Unobserved" = "#fbbf24")) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(
+    title = "Width of 90% credible intervals: observed vs unobserved districts",
+    subtitle = "Round 2 estimates. Unobserved districts have wider intervals (more uncertainty)",
+    x = NULL, y = "Width of 90% CrI",
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggsave("output/figures/ci_comparison_obs_unobs.png", p_ci_box, width = 10, height = 6, dpi = 300, bg = "white")
+p_ci_box
+```
+
+## Caterpillar Plot: Sorted Prevalence with Credible Intervals
+
+```{r caterpillar-plot, fig.height=7, fig.width=10}
+ci_gha <- ci_all %>%
+  filter(country == "GHA") %>%
+  arrange(median) %>%
+  mutate(rank = row_number())
+
+p_cat <- ggplot(ci_gha, aes(x = rank, y = median, colour = status)) +
+  geom_linerange(aes(ymin = q5, ymax = q95), alpha = 0.5, linewidth = 0.3) +
+  geom_point(size = 0.6) +
+  scale_colour_manual(values = c("Observed" = "#2563eb", "Unobserved" = "#fbbf24")) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(
+    title = "Caterpillar plot: district prevalence estimates, Ghana Round 2",
+    subtitle = "260 districts sorted by posterior median. Gold = unobserved (wider CrI).",
+    x = "District (sorted)", y = "Prevalence (posterior median and 90% CrI)",
+    colour = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggsave("output/figures/caterpillar_plot_ghana_r2.png", p_cat, width = 10, height = 7, dpi = 300, bg = "white")
+p_cat
+```
+
+## Direct vs Model-Smoothed Estimates
+
+```{r direct-vs-smoothed, fig.height=7, fig.width=9}
+gha_panel_r2 <- panels[["GHA"]] %>% filter(round_id == 2)
+gha_direct <- gha_panel_r2 %>%
+  filter(observed == 1) %>%
+  mutate(direct_prev = plogis(y_i))
+
+gha_model <- fit_st[["GHA"]]$summary("prevalence") %>%
+  mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>%
+  left_join(
+    panels[["GHA"]] %>% mutate(row_id = row_number()) %>%
+      select(row_id, district_id, round_id),
+    by = "row_id"
+  ) %>%
+  filter(round_id == 2)
+
+shrinkage_df <- gha_direct %>%
+  select(district_id, direct_prev) %>%
+  left_join(gha_model %>% select(district_id, model_prev = median,
+                                   model_lower = q5, model_upper = q95),
+            by = "district_id") %>%
+  left_join(district_lookups[["GHA"]] %>% select(district_id, district_name),
+            by = "district_id")
+
+p_shrink <- ggplot(shrinkage_df, aes(x = direct_prev, y = model_prev)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_linerange(aes(ymin = model_lower, ymax = model_upper),
+                 alpha = 0.15, colour = "#a80050") +
+  geom_point(alpha = 0.6, colour = "#a80050", size = 1.5) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(
+    title = "BYM2 shrinkage: direct estimates vs model-smoothed posteriors",
+    subtitle = "Ghana Round 2. Points below diagonal = model pulled estimate down. Bars = 90% CrI.",
+    x = "Direct estimate (design-based)",
+    y = "Model posterior median"
+  ) +
+  theme_minimal(base_size = 12)
+
+ggsave("output/figures/direct_vs_smoothed_ghana_r2.png", p_shrink, width = 9, height = 7, dpi = 300, bg = "white")
+p_shrink
+```
+
+## Space-Time Convergence Diagnostics
+
+```{r st-diagnostics}
+
+mcmc_rank_overlay(fit_st[["GHA"]]$draws(
+  c("mu", "delta_2", "sigma_b", "phi", "sigma_gamma")
+))
+
+mcmc_pairs(
+  fit_st[["GHA"]]$draws(c("sigma_b", "phi", "sigma_gamma", "delta_2")),
+  off_diag_args = list(size = 0.5, alpha = 0.3)
+)
+
+```
+
+# Model 4: Pooled Three-Country Space-Time Model {#sec:model4}
+
+*Presented before Model 3 in this workbook because it constructs the shared 724-district cross-border graph and pooled panel that the single-round Model 3 reuses. In the written report the logical order is reversed: Model 3 (single-round, temporally aligned) is read first, then Model 4 adds the temporal dimension.*
+
+## Motivation
+
+The country-specific models in Section \ref{sec:model2} treat each
+country as a spatial island, despite shared borders, shared *Anopheles*
+vectors and shared West African monsoon dynamics. The pooled model
+relaxes this by smoothing across the combined 724-district adjacency
+graph (including cross-border edges following @saldarriaga2020) and by
+partially pooling country-specific covariate slopes through a
+hierarchical prior $\beta_{ck} \sim \mathcal{N}(\bar{\beta}_k, \tau_k^2)$.
+
+## Construction
+
+```{r}
+gha_sf <- districts_raw[["GHA"]] %>%
+  mutate(country = "GHA", country_id = 1L,
+         local_id = row_number())
+
+civ_sf <- districts_raw[["CIV"]] %>%
+  mutate(country = "CIV", country_id = 2L,
+         local_id = row_number())
+
+bfa_sf <- districts_raw[["BFA"]] %>%
+  mutate(country = "BFA", country_id = 3L,
+         local_id = row_number())
+
+D_gha <- nrow(gha_sf)  # 260
+D_civ <- nrow(civ_sf)  # 113
+D_bfa <- nrow(bfa_sf)  # 351
+D_all <- D_gha + D_civ + D_bfa  # 724
+
+
+#assigning glboal IDs
+gha_sf$global_id <- 1:D_gha
+civ_sf$global_id <- (D_gha + 1):(D_gha + D_civ)
+bfa_sf$global_id <- (D_gha + D_civ + 1):D_all
+
+# binding them all together
+all_sf <- bind_rows(gha_sf, civ_sf, bfa_sf)
+
+# constracting the queens contiguity on the combined spatial shapefile
+nb_all <- poly2nb(all_sf)
+
+# counting cross border edges 
+cross_border <- 0
+within_country <- 0
+for (i in seq_along(nb_all)) {
+  for (j in nb_all[[i]]) {
+    if (j > i) {  # avoid double counting
+      if (all_sf$country[i] != all_sf$country[j]) {
+        cross_border <- cross_border + 1
+      } else {
+        within_country <- within_country + 1
+      }
+    }
+  }
+}
+
+cross_border
+
+# Extracting edge list for Stan
+edges <- nb_to_edgelist <- function(nb) {
+  n1 <- c(); n2 <- c()
+  for (i in seq_along(nb)) {
+    for (j in nb[[i]]) {
+      if (j > i) {
+        n1 <- c(n1, i)
+        n2 <- c(n2, j)
+      }
+    }
+  }
+  list(node1 = n1, node2 = n2, N_edges = length(n1))
+}
+
+el <- nb_to_edgelist(nb_all)
+cat("    Edges extracted:", el$N_edges, "\n")
+
+# Computing the BYM2 scaling factor based on the combined spatial dataset
+Q <- -nb2mat(nb_all, style = "B", zero.policy = TRUE)
+diag(Q) <- -rowSums(Q)
+Q_scaled <- INLA::inla.scale.model(Q, constr = list(A = matrix(1, 1, D_all), e = 0))
+scaling_factor_all <- exp(mean(log(diag(Q_scaled))))
+
+
+# Country index for each district (1=GHA, 2=CIV, 3=BFA)
+country_vec <- all_sf$country_id  # length 724
+
+# Re-index panels with global district IDs
+# Each country's panel has: district_id (local 1:D), round_id (1 or 2),
+# y_i, psi_i, observed, and covariates
+
+remap_panel <- function(iso, offset) {
+  panels[[iso]] %>%
+    mutate(
+      global_district_id = district_id + offset,
+      country = iso
+    )
+}
+
+panel_pooled <- bind_rows(
+  remap_panel("GHA", 0),
+  remap_panel("CIV", D_gha),
+  remap_panel("BFA", D_gha + D_civ)
+) %>%
+  arrange(global_district_id, round_id)
+
+NT <- nrow(panel_pooled)
+cat("  Panel rows (NT):", NT, "(should be", D_all * 2, ")\n")
+
+# Observation indices
+obs_mask <- panel_pooled$observed == 1
+obs_idx  <- which(obs_mask)
+N_obs    <- sum(obs_mask)
+
+cat("  Observed:", N_obs, "/ Total:", NT, "\n")
+
+# Build X matrix from model panel (already standardised within country)
+model_panel <- read_csv("output/three_country_model_panel.csv",
+                         show_col_types = FALSE)
+
+# Join covariates in the same order as panel_pooled
+cov_names <- c("elev_std", "rainfall_std", "ntl_std", "temp_std",
+               "travel_std", "pop_dens_std", "poverty_std")
+K <- length(cov_names)
+
+X_pooled <- panel_pooled %>%
+  select(-any_of(cov_names)) %>% 
+  left_join(model_panel %>% select(country, district_id, time, all_of(cov_names)),
+            by = c("country", 
+                   "district_id" = "district_id",
+                   "round_id" = "time")) %>%
+  select(all_of(cov_names)) %>%
+  as.matrix()
+
+
+cat("  X matrix:", nrow(X_pooled), "x", ncol(X_pooled), "\n")
+cat("  NAs in X:", sum(is.na(X_pooled)), "\n")
+
+# Assemble Stan data
+stan_data_pooled <- list(
+  N       = D_all,
+  T       = 2L,
+  NT      = NT,
+  C       = 3L,
+  K       = K,
+  N_obs   = N_obs,
+  obs_idx = obs_idx,
+  y       = panel_pooled$y_i[obs_idx],
+  psi     = panel_pooled$psi_i[obs_idx],
+  district = panel_pooled$global_district_id,
+  time     = panel_pooled$round_id,
+  country  = country_vec,
+  X        = X_pooled,
+  N_edges  = el$N_edges,
+  node1    = el$node1,
+  node2    = el$node2,
+  scaling_factor = scaling_factor_all
+)
+
+cat("\n  Stan data assembled.\n")
+cat("    N =", stan_data_pooled$N, "\n")
+cat("    NT =", stan_data_pooled$NT, "\n")
+cat("    C =", stan_data_pooled$C, "\n")
+cat("    K =", stan_data_pooled$K, "\n")
+cat("    N_obs =", stan_data_pooled$N_obs, "\n")
+cat("    N_edges =", stan_data_pooled$N_edges, "\n")
+
+
+###############################################################################
+# STEP 3: Compile and fit
+###############################################################################
+
+cat("\n", strrep("=", 70), "\n")
+cat("  STEP 3: Fitting pooled model\n")
+cat(strrep("=", 70), "\n\n")
+
+mod_pooled <- cmdstan_model("fh_bym2_pooled_3country.stan")
+
+mod_pooled$check_syntax(pedantic = TRUE)
+
+fit_pooled <- mod_pooled$sample(
+  data            = stan_data_pooled,
+  chains          = 4,
+  parallel_chains = 4,
+  iter_warmup     = 1500,
+  iter_sampling   = 2000,
+  adapt_delta     = 0.97,
+  max_treedepth   = 13,
+  refresh         = 200
+)
+
+
+fit_pooled <- ensure_fit(fit_pooled, "m3_pooled")
+
+
+```
+
+
+## Covariate Effects Across Countries (Pooled Model)
+
+```{r}
+covar_labels <- c("Elevation", "Rainfall", "Nighttime lights", "Temperature",
+                  "Travel time", "Pop. density (log)", "Poverty")
+
+
+country_names <- c("GHA", "CIV", "BFA") 
+
+# 1. Extract the country-specific slopes (using 0.05 and 0.95 for a 90% CI)
+beta_pooled <- fit_pooled$summary("beta",
+              mean = mean, 
+              median = median,
+              lower = ~ unname(quantile(.x, 0.05)),
+              upper = ~ unname(quantile(.x, 0.95))) %>%
+  tidyr::extract(variable, into = c("country_idx", "covariate_idx"), 
+                 regex = "beta\\[(\\d+),(\\d+)\\]", convert = TRUE) %>%
+  mutate(
+    country = factor(country_names[country_idx], levels = c("GHA", "BFA", "CIV")),
+    covariate = covar_labels[covariate_idx],
+    # A covariate is significant if the 90% CI does not contain 0
+    is_significant = (lower > 0) | (upper < 0),
+    sig_marker = ifelse(is_significant, "*", "")
+  )
+
+# 2. Extract the global means (using 0.05 and 0.95 for a 90% CI)
+beta_bar <- fit_pooled$summary("beta_bar",
+              mean = mean,
+              lower = ~ unname(quantile(.x, 0.05)),
+              upper = ~ unname(quantile(.x, 0.95))) %>%
+  mutate(
+    covariate_idx = row_number(),
+    covariate = covar_labels[covariate_idx],
+    country = "Global Mean",
+    is_significant = (lower > 0) | (upper < 0),
+    sig_marker = ifelse(is_significant, "*", "")
+  )
+
+# 3. Factor the covariates to preserve plotting order
+beta_pooled$covariate <- factor(beta_pooled$covariate, levels = rev(covar_labels))
+beta_bar$covariate <- factor(beta_bar$covariate, levels = rev(covar_labels))
+
+# 4. Generate the plot
+p_pooled_covars <- ggplot(beta_pooled, aes(x = mean, y = covariate, colour = country, group = country)) +
+  
+  # LAYER 1: The deep background (Zero line)
+  # Made this solid black and slightly thinner so it stands out against the grey bands
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "black", linewidth = 0.6) +
+  
+  # LAYER 2: THE GLOBAL MEAN (beta_bar) AS A GREY BACKGROUND BAND
+  # This replaces the meaningless grid lines with the actual 90% CrI of the global average
+  # geom_linerange(data = beta_bar, 
+  #                aes(xmin = lower, xmax = upper, y = covariate),
+  #                inherit.aes = FALSE, 
+  #                colour = "grey85", linewidth = 5) + 
+                 
+  # Adds a diamond in the exact center of the grey global band
+  geom_point(data = beta_bar, 
+             aes(x = mean, y = covariate),
+             inherit.aes = FALSE, 
+             colour = "grey", shape = 18, size = 3) +
+  
+  # LAYER 3: The foreground (Country-specific estimates)
+  geom_pointrange(aes(xmin = lower, xmax = upper),
+                  position = position_dodge(width = 0.6), size = 0.8) +
+                  
+  # LAYER 4: The text/asterisks (Country level)
+  geom_text(aes(x = upper + 0.02, label = sig_marker),
+            position = position_dodge(width = 0.6),
+            size = 7, vjust = 0.75, hjust = 0, show.legend = FALSE, colour = "black") +
+            
+  # Global Mean Asterisks
+  geom_text(data = beta_bar, 
+            aes(x = upper + 0.02, y = covariate, label = sig_marker),
+            inherit.aes = FALSE,
+            colour = "grey50", size = 7, vjust = 0.75, hjust = 0) +
+              
+  # Formatting
+  scale_colour_brewer(palette = "Dark2", name = "Country") +
+  scale_x_continuous(expand = expansion(mult = c(0.05, 0.15))) + 
+  labs(x = "Coefficient (logit scale)", y = NULL,
+       title = "Covariate effects: Pooled Hierarchical Model",
+       subtitle = "Thick grey bands represent the Global Mean (90% CrI). Asterisks (*) denote significance.") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.major.y = element_blank(), 
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+
+ggsave("output/figures/pooled_covariate_effects.png", p_pooled_covars, width = 10, height = 7, dpi = 300, bg = "white")
+p_pooled_covars
+```
+
+
+
+
+## Model 4 (pooled space-time): parameters
+
+```{r m3-pooled-key-params}
+# Model-level parameters only: intercepts, country deviations, time shifts,
+# spatial hyperparameters, between-country SDs, regional covariate means,
+# national prevalences and odds ratios. District-level effects are excluded.
+param_summary(
+  fit_pooled,
+  "MODEL 4 — Pooled three-country space-time",
+  keep = c("mu", "sigma_b", "phi", "sigma_gamma",
+           "alpha", "delta_2", "beta_bar", "tau",
+           "p_national", "odds_ratio")
+)
+```
+
+```{r m3-country-betas}
+# Model 4 (pooled space-time): country-specific covariate slopes beta[c,k].
+# 3 countries x 7 covariates = 21 effects. Stan index 1=GHA, 2=CIV, 3=BFA.
+country_labels <- c("GHA", "CIV", "BFA")
+beta_tab <- fit_pooled$summary(
+  variables = "beta", "mean", "median", "sd",
+  q5  = ~ quantile(.x, 0.05, names = FALSE),
+  q95 = ~ quantile(.x, 0.95, names = FALSE),
+  "rhat"
+)
+cat("
+==================== MODEL 4 — Pooled space-time: covariate slopes by country ====================
+")
+print(beta_tab, n = Inf)
+```
+
+## Pooled Discussion
+
+
+## Cross-Sectional vs Space-Time Comparison
+
+
+<!-- ```{r} -->
+<!-- # --- Shrinkage Plot: Direct vs Pooled Model Estimates --- -->
+
+<!-- # 1. Isolate the observed districts for Round 2 and calculate precision -->
+<!-- obs_panel <- panel_pooled %>% -->
+<!--   # We only have direct estimates where observed == 1 -->
+<!--   filter(observed == 1, round_id == 2) %>% -->
+<!--   mutate( -->
+<!--     direct_prev = plogis(y_i), -->
+<!--     # Lower SE (psi_i) = Higher Precision (Proxy for Sample Size) -->
+<!--     precision_proxy = 1 / psi_i -->
+<!--   ) -->
+
+<!-- # 2. Extract Posterior Medians for the exact same districts -->
+<!-- model_prev <- fit_pooled$summary("prevalence", median = median) %>% -->
+<!--   mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>% -->
+<!--   # Map back to the full panel to get district info, then filter -->
+<!--   left_join(panel_pooled %>% mutate(row_id = row_number()), by = "row_id") %>% -->
+<!--   filter(observed == 1, round_id == 2) %>% -->
+<!--   select(row_id, model_prev = median) -->
+
+<!-- # 3. Join the datasets -->
+<!-- shrinkage_df <- obs_panel %>% -->
+<!--   left_join(model_prev, by = "row_id") -->
+
+<!-- # 4. Generate the faceted Shrinkage Plot -->
+<!-- p_shrinkage <- ggplot(shrinkage_df, aes(x = direct_prev, y = model_prev)) + -->
+<!--   # The 1:1 Diagonal Line (No Shrinkage / Perfect Agreement) -->
+<!--   geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "black", linewidth = 0.8) + -->
+
+<!--   # Draw a faint segment from the point to the diagonal to explicitly highlight the "pull" -->
+<!--   geom_segment(aes(xend = direct_prev, yend = direct_prev), alpha = 0.3, colour = "grey60") + -->
+
+<!--   # The Data Points, colored by our sample size proxy -->
+<!--   geom_point(aes(fill = precision_proxy), shape = 21, colour = "grey30", size = 3, alpha = 0.85) + -->
+
+<!--   # Facet by country to create the small multiples -->
+<!--   facet_wrap(~country, scales = "free") + -->
+
+<!--   # Color Scale: High precision (large sample) = Dark Blue, Low precision = Yellow/Bright -->
+<!--   scale_fill_viridis_c( -->
+<!--     name = "Data Precision\n(1 / SE)", -->
+<!--     option = "cividis", -->
+<!--     direction = -1 -->
+<!--   ) + -->
+<!--   scale_x_continuous(labels = scales::percent_format(accuracy = 1)) + -->
+<!--   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) + -->
+<!--   labs( -->
+<!--     title = "Hierarchical Shrinkage: Joint Pooled Model vs Direct Estimates", -->
+<!--     subtitle = "Yellow points (low precision/small sample) are pulled strongly toward the spatial mean. Dark points stay on the diagonal.", -->
+<!--     x = "Direct Estimate (Noisy Survey Data)", -->
+<!--     y = "Model Posterior Median (Smoothed)" -->
+<!--   ) + -->
+<!--   theme_minimal(base_size = 13) + -->
+<!--   theme( -->
+<!--     legend.position = "right", -->
+<!--     strip.text = element_text(size = 12, face = "bold"), -->
+<!--     panel.grid.minor = element_blank(), -->
+<!--     panel.spacing = unit(1.5, "lines") -->
+<!--   ) -->
+
+<!-- ggsave("output/figures/pooled_shrinkage_plot.png", p_shrinkage, width = 12, height = 5, dpi = 300, bg = "white") -->
+<!-- p_shrinkage -->
+
+<!-- ``` -->
+
+
+
+
+## Pooled Model Maps
+
+```{r three-country-covariate-maps, fig.height=10, fig.width=14}
+full_panel <- read_csv("output/three_country_full_panel.csv", show_col_types = FALSE)
+
+# Fix the coastal extraction artifacts, then filter for Round 2
+panel_r2_cov <- full_panel %>%
+  # Group by country to calculate a safe replacement value
+  group_by(country, time) %>%
+  mutate(
+    # Calculate the median rainfall for the country (ignoring the negative outliers)
+    safe_rainfall = median(rainfall_sep_dec[rainfall_sep_dec >= 0], na.rm = TRUE),
+    
+    
+    rainfall_sep_dec = ifelse(rainfall_sep_dec < 0, safe_rainfall, rainfall_sep_dec)
+  ) %>%
+  ungroup() %>%
+  filter(time == 2) %>%
+  select(country, district_id, district_name,
+         nightlights, elev_mean_pw, rainfall_sep_dec, temp_sep_dec,
+         travel_time_pw, census_pop_density, poverty_H)
+
+# Join to the shapefile
+covar_map_df <- all_sf %>%
+  left_join(panel_r2_cov, by = c("country", "local_id" = "district_id"))
+
+covar_map_df <- all_sf %>%
+  left_join(panel_r2_cov, by = c("country", "local_id" = "district_id"))
+
+country_borders <- all_sf %>%
+  group_by(country) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop")
+
+make_covar_map <- function(data, var, title, palette = "viridis",
+                            direction = 1, trans = "identity") {
+  ggplot() +
+    geom_sf(data = data, aes(fill = .data[[var]]), colour = "grey50", linewidth = 0.05) +
+    geom_sf(data = country_borders, fill = NA, colour = "black", linewidth = 0.8) +
+    scale_fill_viridis_c(name = title, option = palette, direction = direction,
+                          trans = trans, na.value = "grey80") +
+    theme_void(base_size = 10) +
+    labs(title = title) +
+    theme(legend.position = "right",
+          plot.title = element_text(size = 11, face = "bold"))
+}
+
+p_ntl  <- make_covar_map(covar_map_df, "nightlights", "Nightlights\n(nW/cm2/sr)", "magma")
+p_elev <- make_covar_map(covar_map_df, "elev_mean_pw", "Elevation\n(m)", "terrain", direction = -1)
+p_rain <- make_covar_map(covar_map_df, "rainfall_sep_dec", "Rainfall\nSep-Dec (mm)", "Blues")
+p_temp <- make_covar_map(covar_map_df, "temp_sep_dec", "Temperature\nSep-Dec (C)", "inferno")
+p_trav <- make_covar_map(covar_map_df, "travel_time_pw", "Travel time\n(minutes)", "YlOrRd")
+p_pov  <- make_covar_map(covar_map_df, "poverty_H", "Poverty\nheadcount", "RdYlGn", direction = -1)
+
+p_all_covars <- (p_ntl | p_elev | p_rain) / (p_temp | p_trav | p_pov) +
+  plot_annotation(
+    title = "District-level covariates across Ghana, Burkina Faso, and Cote d'Ivoire",
+    subtitle = "Raw (non-standardised) values for Round 2. Heavy lines = country borders."
+  )
+
+ggsave("output/figures/three_country_covariates_all.png", p_all_covars,
+       width = 14, height = 10, dpi = 300, bg = "white")
+p_all_covars
+```
+
+```{r nightlights-vs-prevalence, fig.height=7, fig.width=14}
+p_ntl_big <- ggplot() +
+  geom_sf(data = covar_map_df, aes(fill = nightlights), colour = "grey50", linewidth = 0.05) +
+  geom_sf(data = country_borders, fill = NA, colour = "black", linewidth = 0.8) +
+  scale_fill_viridis_c(name = "Nightlights\n(nW/cm2/sr)", option = "magma",
+                        trans = "log1p", na.value = "grey80") +
+  labs(title = "Nightlights (VIIRS, log scale)") +
+  theme_void(base_size = 12) +
+  theme(legend.position = "right", plot.title = element_text(size = 13, face = "bold"))
+
+pooled_prev_r2 <- fit_pooled$summary("prevalence", median = median) %>%
+  mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>%
+  left_join(panel_pooled %>% mutate(row_id = row_number()), by = "row_id") %>%
+  filter(round_id == 2)
+
+pooled_map_df <- all_sf %>%
+  left_join(pooled_prev_r2, by = c("global_id" = "global_district_id"))
+
+p_prev_big <- ggplot() +
+  geom_sf(data = pooled_map_df, aes(fill = median), colour = "grey50", linewidth = 0.05) +
+  geom_sf(data = country_borders, fill = NA, colour = "black", linewidth = 0.8) +
+  scale_fill_viridis_c(name = "Prevalence",
+                        labels = scales::percent_format(accuracy = 1),
+                        option = "magma", direction = -1, na.value = "grey80") +
+  labs(title = "Under-5 malaria prevalence (pooled model)") +
+  theme_void(base_size = 12) +
+  theme(legend.position = "right", plot.title = element_text(size = 13, face = "bold"))
+
+p_ntl_vs_prev <- p_ntl_big | p_prev_big
+ggsave("output/figures/nightlights_vs_prevalence.png", p_ntl_vs_prev,
+       width = 14, height = 7, dpi = 300, bg = "white")
+p_ntl_vs_prev
+```
+
+```{r pooled-prevalence-map, fig.height=8, fig.width=10}
+p_pooled_map <- ggplot() +
+  geom_sf(data = pooled_map_df, aes(fill = median), colour = "grey40", linewidth = 0.1) +
+  geom_sf(data = country_borders, fill = NA, colour = "black", linewidth = 0.8) +
+  scale_fill_viridis_c(name = "Prevalence",
+                        labels = scales::percent_format(accuracy = 1),
+                        option = "magma", direction = -1) +
+  labs(title = "Unified West African Under-5 Malaria Prevalence (2021/2022)",
+       subtitle = "Posterior medians from the 724-district pooled hierarchical model") +
+  theme_void(base_size = 14) +
+  theme(legend.position = "right")
+
+ggsave("output/figures/pooled_prevalence_map.png", p_pooled_map,
+       width = 10, height = 8, dpi = 300, bg = "white")
+p_pooled_map
+```
+
+```{r three-country-adjacency, fig.height=8, fig.width=10}
+centroids_all <- st_centroid(all_sf)
+coords_all <- st_coordinates(centroids_all)
+
+edges_all_df <- tibble(
+  from = el$node1, to = el$node2,
+  x_from = coords_all[el$node1, 1], y_from = coords_all[el$node1, 2],
+  x_to   = coords_all[el$node2, 1], y_to   = coords_all[el$node2, 2],
+  edge_type = ifelse(all_sf$country[el$node1] == all_sf$country[el$node2],
+                     "Within-country", "Cross-border")
+)
+
+n_within <- sum(edges_all_df$edge_type == "Within-country")
+n_cross  <- sum(edges_all_df$edge_type == "Cross-border")
+
+p_adj_3country <- ggplot() +
+  geom_sf(data = all_sf, fill = "grey95", colour = "grey80", linewidth = 0.05) +
+  geom_segment(data = edges_all_df %>% filter(edge_type == "Within-country"),
+               aes(x = x_from, y = y_from, xend = x_to, yend = y_to),
+               colour = "#93c5fd", alpha = 0.12, linewidth = 0.15) +
+  geom_segment(data = edges_all_df %>% filter(edge_type == "Cross-border"),
+               aes(x = x_from, y = y_from, xend = x_to, yend = y_to),
+               colour = "#dc2626", alpha = 0.85, linewidth = 0.6) +
+  geom_sf(data = country_borders, fill = NA, colour = "black", linewidth = 1) +
+  labs(title = paste0("Combined 724-district adjacency graph"),
+       subtitle = paste0("Within-country edges (blue): ", n_within,
+                          " | Cross-border edges (red): ", n_cross)) +
+  theme_void(base_size = 12)
+
+ggsave("output/figures/three_country_adjacency.png", p_adj_3country,
+       width = 10, height = 8, dpi = 300, bg = "white")
+p_adj_3country
+```
+
+## Pooled Model Reliability: CV Analysis
+
+```{r pooled-cv-direct}
+cv_df <- direct_est_all %>%
+  filter(round_id == 2) %>%
+  mutate(
+    p_hat = plogis(y_i),
+    se_p = psi_i * p_hat * (1 - p_hat),
+    cv = se_p / p_hat,
+    
+    # UNIFIED THRESHOLDS
+    reliability = case_when(
+      cv < 0.16 ~ "Reliable (CV < 16%)",
+      cv < 0.33 ~ "Caution (CV 16-33%)",
+      TRUE      ~ "Unreliable (CV > 33%)"
+    ),
+    reliability = factor(reliability, levels = c(
+      "Reliable (CV < 16%)", 
+      "Caution (CV 16-33%)", 
+      "Unreliable (CV > 33%)"
+    ))
+  )
+
+# 2. Generate the faceted scatter plot
+p_cv_direct <- ggplot(cv_df, aes(x = p_hat, y = cv, fill = reliability)) +
+  geom_hline(yintercept = 0.16, linetype = "dashed", colour = "#16a34a", linewidth = 0.8) +
+  geom_hline(yintercept = 0.33, linetype = "dashed", colour = "#dc2626", linewidth = 0.8) +
+  
+  geom_point(shape = 21, colour = "grey20", size = 2.5, alpha = 0.85) +
+  facet_wrap(~country, ncol = 3) +
+  
+  scale_fill_manual(
+    name = "Estimate Reliability",
+    values = c(
+      "Reliable (CV < 16%)" = "#16a34a",
+      "Caution (CV 16-33%)" = "#f59e0b",
+      "Unreliable (CV > 33%)" = "#dc2626"
+    )
+  ) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+  # LOCKED Y-AXIS (0 to 1)
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  
+  labs(
+    title = "Direct Estimates: High Uncertainty (Survey Data Only)",
+    subtitle = "Raw estimates before spatial smoothing.",
+    x = "Direct Prevalence Estimate",
+    y = "Coefficient of Variation"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 12, face = "bold")
+  )
+
+ggsave("output/figures/direct_cv_scatter_fixed.png", p_cv_direct, width = 12, height = 5, dpi = 300, bg = "white")
+```
+
+```{r pooled-cv-posterior}
+
+
+
+pooled_full <- fit_pooled$summary("prevalence",
+  mean = mean, median = median, sd = sd) %>%
+  mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>%
+  left_join(panel_pooled %>% mutate(row_id = row_number()), by = "row_id") %>%
+  filter(round_id == 2) %>%
+  mutate(
+    cv = sd / mean,
+    
+    # UNIFIED THRESHOLDS 
+    reliability = case_when(
+      cv < 0.16 ~ "Reliable (CV < 16%)",
+      cv < 0.33 ~ "Caution (CV 16-33%)",
+      TRUE      ~ "Unreliable (CV > 33%)"
+    ),
+    reliability = factor(reliability, levels = c(
+      "Reliable (CV < 16%)",
+      "Caution (CV 16-33%)",
+      "Unreliable (CV > 33%)"
+    ))
+  )
+
+# 2. Generate the faceted scatter plot
+p_cv_pooled <- ggplot(pooled_full, aes(x = median, y = cv, fill = reliability)) +
+  geom_hline(yintercept = 0.16, linetype = "dashed", colour = "#16a34a", linewidth = 0.8) +
+  geom_hline(yintercept = 0.33, linetype = "dashed", colour = "#dc2626", linewidth = 0.8) +
+  
+  geom_point(shape = 21, colour = "grey20", size = 2.5, alpha = 0.85) +
+  facet_wrap(~country, ncol = 3) +
+  
+  scale_fill_manual(
+    name = "Estimate Reliability",
+    values = c(
+      "Reliable (CV < 16%)" = "#16a34a",
+      "Caution (CV 16-33%)" = "#f59e0b",
+      "Unreliable (CV > 33%)" = "#dc2626"
+    )
+  ) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+  # LOCKED Y-AXIS (0 to 1)
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  
+  labs(
+    title = "Pooled Model: Dramatic Reduction in Uncertainty",
+    subtitle = "Hierarchical smoothing rescues unobserved and noisy districts.",
+    x = "Posterior Median Prevalence",
+    y = "Coefficient of Variation",
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 12, face = "bold")
+  )
+
+ggsave("output/figures/cv_reliability_scatter_pooled_fixed.png", p_cv_pooled, width = 12, height = 5, dpi = 300, bg = "white")
+```
+
+```{r pooled-cv-comparison}
+
+
+# 1. Merge the direct and pooled dataframes using inner_join
+
+cv_comparison <- cv_df %>%
+  select(district_id, country, cv_direct = cv) %>% 
+  inner_join(
+    pooled_full %>% select(district_id, cv_pooled = cv), 
+    by = c("district_id") 
+  )
+
+# 2. Generate the Variance Reduction Plot
+p_cv_comparison <- ggplot(cv_comparison, aes(x = cv_direct, y = cv_pooled)) +
+  
+  # The 45-degree line: Anything below this line represents a reduction in variance
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", colour = "grey40", linewidth = 1) +
+  
+  # The 20% Policy Threshold lines
+  geom_vline(xintercept = 0.20, colour = "#e3342f", linetype = "dotted", linewidth = 0.8) +
+  geom_hline(yintercept = 0.20, colour = "#10b981", linetype = "dotted", linewidth = 0.8) +
+  
+  # The data points, colored by country
+  geom_point(aes(fill = country), shape = 21, colour = "white", size = 3, alpha = 0.7) +
+  
+  scale_fill_brewer(palette = "Dark2", name = "Country") +
+  
+  # Force both axes to have the exact same scale and limits so the geometry is honest
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  
+  # Annotations
+  annotate("text", x = 0.75, y = 0.15, label = "Variance Reduced", 
+           colour = "#10b981", fontface = "bold", size = 5) +
+  
+  labs(
+    title = "Variance Reduction: Direct vs. Pooled CV",
+    subtitle = "Points below the dashed line indicate precision gained by the hierarchical model.",
+    x = "Direct Estimate CV (Survey Data)",
+    y = "Pooled Model CV (Hierarchical Smoothing)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+ggsave("output/figures/variance_reduction_45deg.png", p_cv_comparison, width = 8, height = 8, dpi = 300, bg = "white")
+p_cv_comparison
+```
+
+```{r pooled-cv-rescue}
+# 1. Categorize all districts based on strict StatCan guidelines
+rescue_df <- pooled_full %>% 
+  filter(round_id == 2) %>% 
+  select(district_id, country, cv_pooled = cv) %>%
+  left_join(
+    cv_df %>% filter(round_id == 2) %>% select(district_id, cv_direct = cv), 
+    by = "district_id"
+  ) %>%
+  mutate(
+    # Categorize the "Before" state (Raw DHS Data)
+    status_before = case_when(
+      is.na(cv_direct)   ~ "1. No Data (Unobserved)",
+      cv_direct <= 0.165 ~ "2. Acceptable (CV ≤ 16.5%)",
+      cv_direct <= 0.333 ~ "3. Marginal (CV 16.6-33.3%)",
+      TRUE               ~ "4. Unacceptable (CV > 33.3%)"
+    ),
+    # Categorize the "After" state (Pooled Model)
+    status_after = case_when(
+      cv_pooled <= 0.165 ~ "Acceptable (CV ≤ 16.5%)",
+      cv_pooled <= 0.333 ~ "Marginal (CV 16.6-33.3%)",
+      TRUE               ~ "Unacceptable (CV > 33.3%)"
+    )
+  )
+
+
+transition_matrix <- rescue_df %>%
+  count(status_before, status_after) %>%
+  pivot_wider(names_from = status_after, values_from = n, values_fill = 0) %>%
+  arrange(status_before)
+
+print(transition_matrix)
+
+
+rescued_districts <- rescue_df %>%
+  filter(
+    status_before %in% c("1. No Data (Unobserved)", "3. Marginal (CV 16.6-33.3%)", "4. Unacceptable (CV > 33.3%)") & 
+    status_after == "Acceptable (CV ≤ 16.5%)"
+  ) %>%
+  nrow()
+
+cat("\nTotal districts rescued into the Acceptable zone:", rescued_districts, "\n")
+```
+
+```{r cv-reliability-scatter, fig.height=6, fig.width=12}
+# Extract prevalence and CV from the pooled model (Round 2)
+pooled_full <- fit_pooled$summary("prevalence",
+  mean = mean, median = median, sd = sd) %>%
+  mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable))) %>%
+  left_join(panel_pooled %>% mutate(row_id = row_number()), by = "row_id") %>%
+  filter(round_id == 2) %>%
+  mutate(
+    cv = sd / mean,
+    reliability = case_when(
+      cv < 0.16 ~ "Reliable (CV < 16%)",
+      cv < 0.33 ~ "Caution (CV 16-33%)",
+      TRUE      ~ "Unreliable (CV > 33%)"
+    ),
+    reliability = factor(reliability, levels = c("Reliable (CV < 16%)",
+                                                   "Caution (CV 16-33%)",
+                                                   "Unreliable (CV > 33%)"))
+  )
+
+p_cv_reliability <- ggplot(pooled_full, aes(x = median, y = cv, colour = reliability)) +
+  geom_point(alpha = 0.6, size = 1.5) +
+  geom_hline(yintercept = 0.16, linetype = "dashed", colour = "#16a34a", linewidth = 0.5) +
+  geom_hline(yintercept = 0.33, linetype = "dashed", colour = "#dc2626", linewidth = 0.5) +
+  scale_colour_manual(values = c("Reliable (CV < 16%)" = "#16a34a",
+                                  "Caution (CV 16-33%)" = "#f59e0b",
+                                  "Unreliable (CV > 33%)" = "#dc2626")) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  facet_wrap(~country) +
+  labs(
+    title = "Pooled model: prevalence vs coefficient of variation by reliability",
+    subtitle = "Green dashed = 16% CV threshold. Red dashed = 33% threshold. Most districts now in the reliable region.",
+    x = "Posterior median prevalence", y = "Coefficient of variation",
+    colour = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 12, face = "bold"))
+
+ggsave("output/figures/cv_reliability_scatter_pooled.png", p_cv_reliability,
+       width = 12, height = 6, dpi = 300, bg = "white")
+p_cv_reliability
+
+# Print summary
+pooled_full %>%
+  count(country, reliability) %>%
+  pivot_wider(names_from = reliability, values_from = n, values_fill = 0) %>%
+  print()
+```
+
+```{r pooled-cv-map, fig.height=8, fig.width=10}
+pooled_cv_df <- pooled_full %>%
+  select(global_district_id, cv)
+
+pooled_cv_map <- all_sf %>%
+  left_join(pooled_cv_df, by = c("global_id" = "global_district_id"))
+
+p_pooled_cv <- ggplot() +
+  geom_sf(data = pooled_cv_map, aes(fill = cv), colour = "grey40", linewidth = 0.1) +
+  geom_sf(data = country_borders, fill = NA, colour = "black", linewidth = 0.8) +
+  scale_fill_viridis_c(name = "CV",
+                        labels = scales::percent_format(accuracy = 1),
+                        option = "cividis", direction = -1) +
+  labs(title = "Coefficient of Variation: Pooled 3-Country Model (Round 2)",
+       subtitle = "Low CV (dark) = high confidence. High CV (bright) = greater uncertainty.") +
+  theme_void(base_size = 14) +
+  theme(legend.position = "right")
+
+ggsave("output/figures/pooled_cv_map.png", p_pooled_cv,
+       width = 10, height = 8, dpi = 300, bg = "white")
+p_pooled_cv
+```
+
+```{r pooled-prevalence-draws}
+prev_draws <- fit_pooled$draws("prevalence", format = "df") %>%
+  as_tibble() %>%
+  select(starts_with("prevalence["), .draw) %>%
+  pivot_longer(starts_with("prevalence["), names_to = "variable", values_to = "prev") %>%
+  mutate(row_id = as.integer(gsub("prevalence\\[|\\]", "", variable)))
+
+
+prev_full <- prev_draws %>%
+  left_join(full_panel %>% mutate(row_id = row_number()), by = "row_id")
+
+
+national_posteriors <- prev_full %>%
+  group_by(.draw, country, time) %>%
+  summarise(
+    national_prev = weighted.mean(prev, w = census_pop, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Round = factor(ifelse(time == 1, "Round 1 (Baseline)", "Round 2 (Follow-up)"),
+                   levels = c("Round 1 (Baseline)", "Round 2 (Follow-up)"))
+  )
+
+
+p_national_post <- ggplot(national_posteriors, aes(x = national_prev, y = country, fill = Round)) +
+  
+  
+  geom_boxplot(
+    alpha = 0.85, 
+    position = position_dodge(width = 0.75), 
+    outlier.alpha = 0.05, 
+    outlier.size = 0.5,
+    colour = "grey20"
+  ) +
+  
+  scale_fill_manual(
+    values = c("Round 1 (Baseline)" = "#e6b000", "Round 2 (Follow-up)" = "#3182bd")
+  ) +
+  
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+  
+  labs(
+    title = "Posterior Uncertainty: National Malaria Prevalence",
+    subtitle = "Population-weighted aggregation of 724 district-level posterior draws.",
+    x = "Estimated Prevalence",
+    y = NULL,
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+ggsave("output/figures/posterior_boxplot_prevalence.png", p_national_post, width = 10, height = 6, dpi = 300, bg = "white")
+```
+
+# Model 3: Single-Round (Round-2) Pooled Three-Country Model {#sec:model3}
+
+*This model reuses the shared cross-border graph and pooled panel constructed in Model 4 above, restricted to the temporally aligned 2021/2022 round.*
+
+## Motivation
+
+The full three-country pooled model joins two DHS rounds per country.
+The Round 1 surveys, however, span four calendar years across countries
+(Burkina Faso 2010, Côte d'Ivoire 2011, Ghana 2014), while the Round 2
+surveys are tightly clustered within a single year (Burkina Faso 2021,
+Côte d'Ivoire 2021, Ghana 2022). Because the BYM2 component smooths
+spatial residuals across the combined cross-border adjacency graph, the
+Round 1 calendar offset raises a legitimate concern that cross-border
+edges may absorb temporal as well as spatial variation during a period
+of substantial intervention scale-up across the region [@bhatt2015;
+@weiss2020].
+
+To isolate the cross-border spatial story from this temporal-misalignment
+concern, we fit a Round-2-only pooled model. Restricting to the 2021–2022
+window guarantees that cross-border smoothing operates on contemporaneous
+prevalence surfaces; the published cross-border SAE precedent of
+@saldarriaga2020 used a comparable two-year alignment window (2007–2009).
+With a single time point, the Knorr-Held Type I interaction $\gamma_{it}$
+and the country-specific time shifts $\delta_{c,t}$ become unnecessary,
+and the model reduces to a pure spatial BYM2 with hierarchical
+country-specific covariate effects. Findings shared between this model
+and the full space-time pooled specification are the most robust results
+of the analysis; differences localise the contribution of the Round 1
+data and the cross-temporal smoothing.
+
+## Specification
+
+For each observed Round 2 district $i$, the design-based logit prevalence
+direct estimate $y_i$ retains the same Fay-Herriot likelihood used
+throughout [@wakefield2020]:
+$$y_i \sim \mathcal{N}\!\left(\theta_i, \; \psi_i^2 \right),$$
+with $\psi_i$ obtained by Taylor-series linearisation [@binder1983;
+@lumley2010] and transformed to the logit scale via the delta method,
+exactly as in the space-time models.
+
+The latent logit prevalence decomposes as
+$$\theta_i = \mu + \alpha_{c[i]} + b_i +
+            \mathbf{x}_i^{\top} \bm{\beta}_{c[i]},$$
+where $\mu$ is the regional logit intercept across the three countries,
+$\alpha_{c[i]}$ is a country-specific deviation with the
+sum-to-zero constraint $\sum_c \alpha_c = 0$ for identifiability with
+$\mu$, $b_i$ is the BYM2 spatial random effect on the combined
+724-district graph, and $\bm{\beta}_{c[i]}$ is the country-specific
+vector of covariate effects on the seven standardised covariates.
+
+The BYM2 spatial effect uses the same scaled, non-centred parameterisation
+as the space-time models [@riebler2016]:
+$$b_i = \sigma_b \left(
+  \sqrt{1-\phi}\; v_i + \sqrt{\phi / s}\; u_i
+\right),
+\qquad
+v_i \stackrel{\mathrm{iid}}{\sim} \mathcal{N}(0,1),
+\qquad
+u_i \sim \mathrm{ICAR}(W),$$
+with $u_i$ sum-constrained, $W$ the combined adjacency matrix including
+cross-border queen-contiguity edges, and $s$ the scaling factor of
+@riebler2016 making $\phi \in (0,1)$ interpretable as the structured-
+variance fraction. Disconnected components are reconnected by snap
+tolerance to ensure a proper ICAR [@freni2018].
+
+Country-specific covariate effects are partially pooled through a
+hierarchical prior,
+$$\beta_{ck} \;\sim\; \mathcal{N}\!\left(\bar{\beta}_k, \tau_k^2\right),
+\qquad c \in \{1,2,3\}, \quad k \in \{1, \ldots, 7\},$$
+where $\bar{\beta}_k$ is the regional consensus effect of covariate $k$
+and $\tau_k$ the between-country standard deviation. Small $\tau_k$
+indicates that countries share a common relationship between covariate
+$k$ and malaria risk; large $\tau_k$ allows the slopes to diverge.
+The slopes are implemented non-centred as
+$\beta_{ck} = \bar{\beta}_k + \tau_k z_{ck}$ with
+$z_{ck} \sim \mathcal{N}(0,1)$.
+
+## Priors
+
+Priors match those used in the country-specific and full pooled models
+so that posterior comparisons are not driven by prior changes:
+$\mu \sim \mathcal{N}(-1.85, 1)$, $\alpha_{\text{raw}} \sim \mathcal{N}(0, 1)$
+with sum-to-zero, $\sigma_b \sim \mathrm{Exp}(4.6)$ (PC-style;
+approximates $P(\sigma_b > 1) = 0.01$ [@simpson2017]),
+$\phi \sim \mathrm{Beta}(3, 2)$, $\bar{\beta}_k \sim \mathcal{N}(0, 1)$,
+$\tau_k \sim \mathrm{Exp}(2)$.
+
+## Stan implementation
+
+```{r r2-stan-write, eval = FALSE}
+bym2_r2_pooled_code <- "
+data {
+  int<lower=1> N;
+  int<lower=1> C;
+  array[N] int<lower=1, upper=C> country;
+
+  int<lower=1> N_obs;
+  array[N_obs] int<lower=1, upper=N> obs_idx;
+  vector[N_obs] y;
+  vector<lower=0>[N_obs] psi;
+
+  int<lower=1> N_edges;
+  array[N_edges] int<lower=1, upper=N> node1;
+  array[N_edges] int<lower=1, upper=N> node2;
+  real<lower=0> scaling_factor;
+
+  int<lower=1> K;
+  matrix[N, K] X;
+}
+parameters {
+  real mu;
+  vector[C] alpha_raw;
+  vector[N] v;
+  vector[N] u_raw;
+  real<lower=0> sigma_b;
+  real<lower=0, upper=1> phi;
+  vector[K] beta_bar;
+  vector<lower=0>[K] tau;
+  matrix[C, K] beta_z;
+}
+transformed parameters {
+  vector[C] alpha = alpha_raw - mean(alpha_raw);
+  vector[N] u = u_raw - mean(u_raw);
+  vector[N] b = sigma_b * (sqrt(1 - phi) * v
+                           + sqrt(phi / scaling_factor) * u);
+  matrix[C, K] beta;
+  for (c in 1:C)
+    for (k in 1:K)
+      beta[c, k] = beta_bar[k] + tau[k] * beta_z[c, k];
+
+  vector[N] theta;
+  for (i in 1:N) {
+    int ci = country[i];
+    theta[i] = mu + alpha[ci] + b[i] + dot_product(X[i], beta[ci]');
+  }
+}
+model {
+  mu        ~ normal(-1.85, 1.0);
+  alpha_raw ~ normal(0, 1.0);
+  sigma_b   ~ exponential(4.6);
+  phi       ~ beta(3, 2);
+
+  v         ~ std_normal();
+  target   += -0.5 * dot_self(u_raw[node1] - u_raw[node2]);
+  sum(u_raw) ~ normal(0, 0.001 * N);
+
+  beta_bar  ~ normal(0, 1);
+  tau       ~ exponential(2);
+  to_vector(beta_z) ~ std_normal();
+
+  y ~ normal(theta[obs_idx], psi);
+}
+generated quantities {
+  vector[N_obs] log_lik;
+  for (i in 1:N_obs)
+    log_lik[i] = normal_lpdf(y[i] | theta[obs_idx[i]], psi[i]);
+
+  vector[N] prevalence;
+  for (i in 1:N)
+    prevalence[i] = inv_logit(theta[i]);
+
+  vector[C] p_national;
+  for (c in 1:C) {
+    real sum_p = 0;
+    int  n_c   = 0;
+    for (i in 1:N) {
+      if (country[i] == c) {
+        sum_p += prevalence[i];
+        n_c   += 1;
+      }
+    }
+    p_national[c] = sum_p / n_c;
+  }
+}
+"
+writeLines(bym2_r2_pooled_code, "fh_bym2_pooled_3country_round2.stan")
+```
+
+## Build Stan data for Round 2 and fit
+
+The Round-2-only model reuses the same combined adjacency graph
+(`el`, `scaling_factor_all`), the same country index vector
+(`country_vec`), and the same district-id frame (`D_all = 724`) used by
+the full pooled model. Only the panel and covariate matrix are subset to
+$t = 2$.
+
+```{r r2-stan-data, eval = FALSE}
+# Subset the pooled panel to Round 2 only
+panel_r2 <- panel_pooled %>% filter(round_id == 2L)
+
+obs_mask_r2 <- panel_r2$observed == 1
+obs_idx_r2  <- which(obs_mask_r2)
+N_obs_r2    <- length(obs_idx_r2)
+
+# Round-2 covariate matrix in the same district order
+X_r2 <- panel_r2 %>%
+  select(-any_of(cov_names)) %>%
+  left_join(
+    model_panel %>% filter(time == 2L) %>%
+      select(country, district_id, all_of(cov_names)),
+    by = c("country", "district_id" = "district_id")
+  ) %>%
+  select(all_of(cov_names)) %>%
+  as.matrix()
+
+stan_data_r2 <- list(
+  N              = D_all,
+  C              = 3L,
+  country        = country_vec,
+  N_obs          = N_obs_r2,
+  obs_idx        = obs_idx_r2,
+  y              = panel_r2$y_i[obs_idx_r2],
+  psi            = panel_r2$psi_i[obs_idx_r2],
+  N_edges        = el$N_edges,
+  node1          = el$node1,
+  node2          = el$node2,
+  scaling_factor = scaling_factor_all,
+  K              = length(cov_names),
+  X              = X_r2
+)
+
+cat("Round-2 pooled Stan data assembled.\n")
+cat("  N =", stan_data_r2$N, "\n")
+cat("  N_obs =", stan_data_r2$N_obs, "\n")
+cat("  K =", stan_data_r2$K, "\n")
+cat("  N_edges =", stan_data_r2$N_edges, "\n")
+```
+
+```{r r2-stan-fit, eval = FALSE}
+mod_r2 <- cmdstan_model("fh_bym2_pooled_3country_round2.stan")
+mod_r2$check_syntax(pedantic = TRUE)
+
+fit_r2 <- mod_r2$sample(
+  data            = stan_data_r2,
+  chains          = 4,
+  parallel_chains = 4,
+  iter_warmup     = 1500,
+  iter_sampling   = 2000,
+  adapt_delta     = 0.97,
+  max_treedepth   = 13,
+  seed            = 2026,
+  refresh         = 200
+)
+
+fit_r2$summary(c("mu", "alpha", "sigma_b", "phi",
+                 "beta_bar", "tau", "p_national"))
+```
+
+## Comparison: Model 3 (single-round) vs Model 4 (space-time)
+
+```{r m3-m4-comparison}
+# Side-by-side comparison of the parameters shared by the single-round pooled
+# model (Model 3, fit_r2) and the pooled space-time model (Model 4,
+# fit_pooled). Stable values indicate the cross-border spatial structure and
+# the regional covariate effects do not depend on including the temporally
+# misaligned Round 1 data.
+library(dplyr)
+
+pull_pars <- function(fit, model_label, pars) {
+  vars <- intersect(pars, fit$metadata()$stan_variables)
+  if (length(vars) == 0L) return(NULL)
+  fit$summary(variables = vars, "median",
+              q5  = ~ quantile(.x, 0.05, names = FALSE),
+              q95 = ~ quantile(.x, 0.95, names = FALSE)) %>%
+    transmute(parameter = variable,
+              !!model_label := sprintf("%.2f [%.2f, %.2f]", median, q5, q95))
+}
+
+shared_pars <- c("sigma_b", "phi",
+                 paste0("beta_bar[", 1:7, "]"),
+                 paste0("tau[", 1:7, "]"))
+
+cmp <- full_join(
+  pull_pars(fit_r2,     "Model 3 (single-round)", shared_pars),
+  pull_pars(fit_pooled, "Model 4 (space-time)",   shared_pars),
+  by = "parameter"
+)
+
+cov_names <- c("Elevation", "Rainfall", "Nighttime lights", "Temperature",
+               "Travel time", "Pop. density", "Poverty")
+relabel <- function(p) {
+  for (k in 7:1) {
+    p <- sub(paste0("beta_bar\[", k, "\]"), paste0("beta_bar (", cov_names[k], ")"), p)
+    p <- sub(paste0("tau\[", k, "\]"),       paste0("tau (", cov_names[k], ")"),       p)
+  }
+  p <- sub("^sigma_b$", "sigma_b (spatial SD)", p)
+  p <- sub("^phi$",     "phi (structured share)", p)
+  p
+}
+cmp$parameter <- vapply(cmp$parameter, relabel, character(1))
+
+knitr::kable(
+  cmp, booktabs = TRUE,
+  caption = "Shared parameters: single-round pooled (Model 3) vs space-time pooled (Model 4). Posterior median [90% CrI]."
+)
+```
+
+## Interpretation
+
+The Round-2-only pooled model functions as one of three complementary
+specifications in this analysis. The country-specific space-time models
+provide the temporal-change story (national odds ratios between rounds,
+district-level deviations $\gamma_{it}^{\,*}$) under the methodologically
+conservative convention of fitting each country independently
+[@wakefield2020]. The Round-2-only pooled model presented here provides
+the cross-border borrowing story — the regional consensus covariate
+effects $\bar{\beta}_k$, the spatial parameters $\sigma_b$ and $\phi$ on
+the combined graph, and the hierarchical rescue of country-specific
+signals — under temporal alignment guaranteed by construction. The full
+space-time pooled model integrates both extensions, with the Round 1
+calendar offset acknowledged as a limitation. Findings that are stable
+across all three specifications are the most robust results of this
+work.
+
+
+## Model 3 (single-round pooled): parameters
+
+```{r m4-r2-pooled-summary}
+param_summary(
+  fit_r2,
+  "MODEL 3 — Single-round (Round-2) pooled",
+  keep = c("mu", "sigma_b", "phi", "alpha", "beta_bar", "tau", "p_national")
+)
+```
+
+```{r m4-r2-country-betas}
+# Model 3 (single-round pooled): country-specific covariate slopes beta[c,k].
+r2_beta_tab <- tryCatch(
+  fit_r2$summary(
+    variables = "beta", "mean", "median", "sd",
+    q5  = ~ quantile(.x, 0.05, names = FALSE),
+    q95 = ~ quantile(.x, 0.95, names = FALSE),
+    "rhat"),
+  error = function(e) { cat("[beta summary failed:", conditionMessage(e), "]
+"); NULL }
+)
+if (!is.null(r2_beta_tab)) {
+  cat("
+==================== MODEL 3 — Single-round pooled: covariate slopes by country ====================
+")
+  print(r2_beta_tab, n = Inf)
+}
+```
+
+
+

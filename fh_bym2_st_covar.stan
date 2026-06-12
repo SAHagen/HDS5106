@@ -49,16 +49,16 @@ parameters {
 
   real<lower=0> sigma_b;                            // district SD
   real<lower=0, upper=1> phi;                       // BYM2 mixing
-  real<lower=0> sigma_delta;                        // temporal SD
-
+  //real<lower=0> sigma_delta;                        // temporal SD
+  
+  vector[N] gamma_raw;  // raw interaction
+  real<lower=0> sigma_gamma;
   vector[K] beta;                                   // covariate coefficients
 }
 
 transformed parameters {
-  // Sum-to-zero ICAR
+   // BYM2 district effect
   vector[N] u = u_raw - mean(u_raw);
-
-  // BYM2 district effect
   vector[N] b = sigma_b * (sqrt(1 - phi) * v + sqrt(phi / scaling_factor) * u);
 
   // Sum-to-zero temporal effect
@@ -66,12 +66,22 @@ transformed parameters {
   delta[1] =  alpha;
   delta[2] = -alpha;
 
+  // Space-time interaction, sum-to-zero across districts within round 1
+  // Antisymmetric across time: γ_{i,2} = -γ_{i,1}
+  vector[N] gamma_star = gamma_raw - mean(gamma_raw);
+
+  // Linear predictor
   // Linear predictor
   vector[NT] theta;
   for (n in 1:NT) {
-    theta[n] = mu + b[district[n]] + delta[time[n]];
+    real interaction;
+    if (time[n] == 1) {
+      interaction =  sigma_gamma * gamma_star[district[n]];
+    } else {
+      interaction = -sigma_gamma * gamma_star[district[n]];
+    }
+    theta[n] = mu + b[district[n]] + delta[time[n]] + interaction;
   }
-
   // Covariate contribution
   if (K > 0) {
     theta += X * beta;
@@ -81,32 +91,41 @@ transformed parameters {
 model {
   // Priors
   mu          ~ normal(-2, 1);
+  alpha       ~ normal(0, 2.5);     // direct weakly informative on temporal effect
   sigma_b     ~ exponential(4.6);
   phi         ~ beta(3, 2);
-  sigma_delta ~ exponential(2);
-  alpha       ~ normal(0, sigma_delta);
+  sigma_gamma ~ exponential(2);     // SD of trajectory deviations
+  beta        ~ normal(0, 1);
 
-  v ~ std_normal();
+  // Non-centred parameterisations
+  v         ~ std_normal();
+  gamma_raw ~ std_normal();
 
-  // ICAR prior
+  // ICAR prior + soft sum-to-zero
   target += -0.5 * dot_self(u_raw[node1] - u_raw[node2]);
   sum(u_raw) ~ normal(0, 0.001 * N);
-
-  // Covariate coefficients (weakly informative for standardised X)
-  beta ~ normal(0, 1);
 
   // Likelihood
   y ~ normal(theta[obs_idx], psi);
 }
 
 generated quantities {
+  // District-round prevalence
   vector<lower=0, upper=1>[NT] prevalence;
-  for (n in 1:NT) {
-    prevalence[n] = inv_logit(theta[n]);
-  }
+  for (n in 1:NT) prevalence[n] = inv_logit(theta[n]);
 
-  real delta_change = 2 * alpha;
+  // National change on logit scale (signed: negative = decline)
+  real delta_change = -2 * alpha;
+
+  // National-level (intercept-only) round prevalences
   real p_round1 = inv_logit(mu + alpha);
   real p_round2 = inv_logit(mu - alpha);
+
+  // District-level trajectory deviation on logit scale
+  // (negative = faster decline than national; positive = slower / rising)
+  vector[N] district_trend_dev;
+  for (i in 1:N) {
+    district_trend_dev[i] = -2 * sigma_gamma * gamma_star[i];
+  }
 }
 

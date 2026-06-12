@@ -1,0 +1,66 @@
+fit-persistence-helpers	
+district-boundaries	
+survey-index	
+pr-files	district_lookups	districts_ordered	survey_index
+direct-estimates	pr_list
+build-panel	
+adjacency-scaling	
+load-covariates	
+join-covariates	covariates_panel
+correlation-heatmap	covariates_panel
+direct-est-dist	direct_est_all
+adjacency-graph-plot	district_lookups	districts_raw	spatial
+build-stan-data-cs	
+build-stan-data-st	
+assemble-stan-data	build_stan_data_cs	build_stan_data_st	panels	spatial
+fit-iid	ensure_fit	stan_data
+m1-iid-summary	fit_iid
+fit-icar	ensure_fit	sd_cs
+m1-icar-summary	fit_icar
+fit-cross-sectional	ensure_fit	stan_data
+m1-bym2-summary	fit_gha_cs
+m1-bym2-keyparams	fit_gha_cs
+loo-cv	ensure_fit	sd_cs
+model-comparison-maps	districts_raw	fit_bym2_loo	fit_gha_cs	fit_icar	fit_iid	panels	stan_data
+ppc-cs	fit_gha_cs	stan_data
+cs-trace	fit_gha_cs
+fit-spacetime-all	ensure_fit	stan_data
+m2-summaries	fit_st
+m2-key-params	fit_st	safe_print
+summary-across-countries	fit_st
+prior-post	fit_st
+covariate-forest	summary_all
+prevalence-maps	district_lookups	districts_raw	fit_st	panels
+trend-deviation-map	district_lookups	districts_raw	fit_st
+top-deviation-districts	dev_summary_gha
+uncertainty-maps	district_lookups	districts_raw	fit_st	panels
+observed-unobserved-map	district_lookups	districts_raw	panels
+ci-comparison-obs-unobs	district_lookups	fit_st	panels	stan_data
+caterpillar-plot	ci_all
+direct-vs-smoothed	district_lookups	fit_st	model_prev	panels
+st-diagnostics	fit_st
+unnamed-chunk-1	districts_raw	ensure_fit	panels
+unnamed-chunk-2	fit_pooled
+m3-pooled-summary	fit_pooled
+m3-pooled-key-params	fit_pooled
+m3-country-betas	fit_pooled
+three-country-covariate-maps	all_sf
+nightlights-vs-prevalence	all_sf	country_borders	covar_map_df	fit_pooled	panel_pooled
+pooled-prevalence-map	country_borders	pooled_map_df
+three-country-adjacency	all_sf	country_borders	el
+pooled-cv-direct	direct_est_all
+pooled-cv-posterior	fit_pooled	panel_pooled
+pooled-cv-comparison	cv_df	pooled_full
+pooled-cv-rescue	cv_df	pooled_full
+cv-reliability-scatter	fit_pooled	panel_pooled
+pooled-cv-map	all_sf	country_borders	pooled_full
+pooled-prevalence-draws	fit_pooled	full_panel
+r2-stan-write	
+r2-stan-data	country_vec	cov_names	D_all	el	model_panel	panel_pooled	scaling_factor_all
+r2-stan-fit	
+r2-vs-full-spatial	fit_pooled
+r2-vs-full-covariates	fit_pooled
+r2-vs-full-prevalence-r2	fit_pooled	panel_pooled	prev_full
+m4-r2-pooled-summary	
+m4-r2-pooled-key-params	
+m4-r2-country-betas	
