@@ -535,29 +535,11 @@ that follows is driven by a change of specification.
 
 ## Results
 
-The single-round pooled model establishes that cross-border borrowing is
-both feasible and informative. The hierarchical slopes recover a regional
-consensus on the covariate effects while still allowing each country to
-depart from it, and the country intercepts order as expected, with Burkina
-Faso well above and Côte d'Ivoire below the Ghanaian reference. Nighttime
-lights, the urbanisation proxy, is protective in every country and tightly
-pooled, marking it as a shared regional effect rather than a
-country-specific quirk; elevation behaves similarly. The between-country
-standard deviations $\tau_k$ are small across the covariates, which is why
-the country slopes are drawn firmly toward their regional means and why
-the sparsely sampled Côte d'Ivoire districts gain precision by borrowing
-from their better-observed neighbours.
 
-Because every Round 2 surface entering the model is contemporaneous, the
-spatial parameters here carry no temporal contamination, and they serve as
-the reference against which the full space-time model is judged. The
-quantitative summaries are produced directly from the fitted object; the
-tables below are completed once the single-round pooled model has been run
-to convergence alongside the temporal model of Section \ref{sec:m4}.
 
 ```{r m3-spatial, eval=FALSE}
 # Posterior summaries from the single-round (Round 2) pooled model
-# Populate from fit_r2 once fitted: sigma_b, phi, alpha[1:3], beta_bar[1:7],
+#  sigma_b, phi, alpha[1:3], beta_bar[1:7],
 # tau[1:7], and the country-specific beta[c,k].
 ```
 
@@ -565,10 +547,6 @@ to convergence alongside the temporal model of Section \ref{sec:m4}.
 include_graphics(paste0(fig, "pooled_prevalence_map.png"))
 ```
 
-With the cross-border structure established on temporally aligned data, the
-remaining question is what the earlier round adds. The next model
-reintroduces the temporal dimension and confronts the adjacency-across-time
-concern directly.
 
 # Model 4: Pooled Three-Country Space-Time Model {#sec:m4}
 
@@ -606,20 +584,7 @@ relative to that model are the temporal terms.
 
 ## Results
 
-Adding the temporal dimension leaves the cross-border spatial structure
-essentially intact while recovering the national trajectories. The
-structured share of spatial variation is $\phi = 0.83$ and the marginal
-spatial standard deviation $\sigma_b = 0.65$; read alongside the
-single-round model, the stability of these quantities is the empirical
-answer to the adjacency-across-time concern, since a spatial field that
-depended on smoothing across the four-year Round 1 gap would shift when
-that round is added. The national trajectories are sharply divergent and
-match the country-level fits closely: the temporal shifts are $-1.13$ for
-Ghana, $-2.53$ for Burkina Faso and $+0.74$ for Côte d'Ivoire, implying
-between-round odds ratios of about 0.32, 0.08 and 2.13 respectively. Two
-countries in rapid retreat and a third moving against the regional tide is
-thus a feature of the data, stable across every specification that admits
-a temporal comparison.
+
 
 ```{r m4-pooled-st}
 m5 <- data.frame(
@@ -632,65 +597,33 @@ kable(m5, booktabs = TRUE, escape = FALSE, caption = "\\label{tab:m4}Pooled spac
   kable_styling(latex_options = "hold_position")
 ```
 
-The covariate effects agree closely with the single-round model, which is
-the second strand of the robustness check: nighttime lights remain
-protective in every country with a regional mean near $-0.20$, elevation
-remains consistently protective, and the between-country spreads $\tau_k$
-remain small. Where a covariate effect does differ between the two pooled
-models, it is one whose relationship with malaria plausibly shifted over
-time or whose earlier-round measurement was weaker, poverty being the
-clearest case since its values come from the most recent census in each
-country.
+
 
 ```{r m4forest, fig.cap="\\label{fig:m5forest}Pooled space-time model: country-specific covariate slopes with regional means overlaid. Effects with small between-country spread, such as nighttime lights, are tightly pooled.", eval=FALSE}
 include_graphics(paste0(fig, "pooled_covariate_effects.png"))
 ```
 
-The estimation gains from pooling are clearest in the coefficient of
-variation. Many districts that were unobserved or noisily measured move
-into a usable reliability range: 72 districts with no data or unacceptable
-design-based variation are rescued into the acceptable range, and the
-prevalence surface is continuous across national borders rather than
-breaking at administrative lines.
+
 
 ```{r m4rescue, fig.cap="\\label{fig:m5rescue}Direct versus pooled coefficient of variation. Points below the diagonal gain precision from the hierarchical model.", eval=FALSE}
 include_graphics(paste0(fig, "variance_reduction_45deg.png"))
 ```
 
-Taken together, the single-round and space-time pooled models give
-consistent cross-border spatial structure and consistent covariate
-effects, with the space-time model adding the temporal trajectories on top.
-The stability across the two is the strongest evidence that the
-cross-border borrowing reflects genuine geography rather than an artefact
-of joining mismatched survey years.
 
 # External Validation and Sensitivity Analyses {#sec:validation}
 
 The estimates presented above are internally coherent and well behaved
 under the model's own diagnostics, but a full assessment requires checking
 them against an independent source and probing their sensitivity to the
-modelling choices. Both are planned and are described here; the results
-will be added once the analyses are complete.
+modelling choices. To be done...
+
 
 ## Validation against the Malaria Atlas Project
 
 The Malaria Atlas Project publishes model-based geostatistical surfaces of
 *Plasmodium falciparum* parasite-rate for sub-Saharan Africa, built from a
 different evidence base and a different modelling tradition than the
-area-level approach used here [@bhatt2015; @weiss2020]. We plan to extract
-the relevant raster surfaces through the `malariaAtlas` package,
-aggregate them to district level by population-weighted averaging using the
-same WorldPop surface used for the covariates, and compare them with the
-posterior district estimates from the pooled models. The comparison will
-be framed as concordance with an independent model rather than validation
-against ground truth, since neither source observes true district
-prevalence directly, and will report rank agreement, a Bland-Altman style
-assessment of the differences, and maps of where the two sources diverge.
-One difference in target quantity will be noted explicitly: the Malaria
-Atlas surfaces describe an age-standardised parasite rate in two-to-ten
-year olds, whereas the present estimates describe rapid-test positivity in
-children aged six to fifty-nine months, so a level offset is expected and
-the emphasis will fall on spatial and relative agreement.
+area-level approach used here [@bhatt2015; @weiss2020]. To be done.....
 
 ## Sensitivity analyses
 
