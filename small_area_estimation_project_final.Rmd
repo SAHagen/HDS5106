@@ -41,11 +41,8 @@ library(patchwork)
 library(ggcorrplot)
 library(posterior)
 
-# ---- University of Galway brand palette ------------------------------
+# University of Galway brand palette
 # Source: Brand Guidelines v13, primary + secondary palettes.
-# Use galway_pal()  for categorical scales
-# Use galway_grad() for continuous (sequential) scales
-# Use galway_div()  for diverging scales (e.g. residuals, anomalies)
 galway_maroon       <- "#a80050"   # primary
 galway_deep_maroon  <- "#84003d"   # primary
 galway_magenta      <- "#e6007e"   # primary accent
@@ -63,7 +60,7 @@ galway_sandstone    <- "#c4c0b7"   # neutral
 # 3-class categorical (e.g. Country = GHA, BFA, CIV)
 galway_three <- c(galway_maroon, galway_ocean, galway_green)
 
-# Generic categorical palette (up to 8 distinct hues)
+# Generic categorical palette
 galway_pal <- function(n = 8) {
   base <- c(galway_maroon, galway_ocean, galway_green, galway_orange,
             galway_violet, galway_aqua, galway_yellow, galway_deep_maroon)
@@ -71,7 +68,6 @@ galway_pal <- function(n = 8) {
 }
 
 # Sequential gradient for prevalence / continuous outcomes
-# (light sandstone -> Galway maroon)
 galway_grad <- function() {
   ggplot2::scale_fill_gradientn(
     colours = c("#f7eaef", "#e9b9cb", "#d271a0", "#b03073", galway_deep_maroon),
@@ -217,8 +213,8 @@ provides the spatial reference.
 
 | Country | Round 1 | Round 2 |
 |---|---|---|
-| Burkina Faso | DHS 2010 | DHS/MIS 2021 |
-| Côte d'Ivoire | DHS 2011 | DHS/MIS 2021 |
+| Burkina Faso | DHS 2010 | DHS 2021 |
+| Côte d'Ivoire | DHS 2011 | DHS 2021 |
 | Ghana | DHS 2014 | DHS 2022 |
 
 <!-- Because the DHS data needs formal approve before being used and as we are not allowed to share to anyone who is not involved in this project, for reproducibility of our work, you need to make your own formal request to the dhs program. the file names are defined in the coming sections. the github for this project does not contain any data from the DHS. -->
@@ -390,6 +386,12 @@ direct_est_all %>% count(country, year, name = "observed_districts")
 # Panel Construction {#sec:panel}
 
 ```{r build-panel}
+
+# PURPOSE: 
+# 1. Creates a complete dataset mapping every district to every year (filling in gaps).
+# 2. Flags which district-year combinations actually have recorded data.
+# 3. Outputs a summary report showing the percentage of data coverage per year for each country.
+
 build_panel <- function(country_iso, district_lookup, direct_est_all) {
   rounds <- direct_est_all %>%
     filter(country == country_iso) %>%
@@ -434,6 +436,9 @@ interpretable as the proportion of structured variance regardless of
 graph topology.
 
 ```{r adjacency-scaling}
+
+# Maps out which districts share geographical borders (creating a spatial "network")  and calculates a math "scaling factor" so the statistical model correctly balances neighborly influence then outputs a summary showing the number of districts and shared borders per country.
+
 compute_scaling_factor <- function(nb, D) {
   adj_mat <- nb2mat(nb, style = "B", zero.policy = TRUE)
   Q_icar  <- Diagonal(x = rowSums(adj_mat)) - as(adj_mat, "sparseMatrix")
@@ -538,22 +543,6 @@ ggcorrplot(
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-## Distribution of Direct Estimates
-
-```{r direct-est-dist}
-direct_est_all %>%
-  mutate(prevalence = plogis(y_i)) %>%
-  ggplot(aes(x = factor(year), y = prevalence)) +
-  geom_violin(fill = "steelblue", alpha = 0.4) +
-  geom_jitter(width = 0.1, alpha = 0.4, size = 0.5) +
-  facet_wrap(~country, scales = "free_x") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  labs(x = NULL, y = "Direct prevalence estimate (district)",
-       title = "Distribution of district-level direct estimates by country and round",
-       subtitle = "Each point is one district; violin shows the distribution") +
-  theme_minimal(base_size = 11)
-```
-
 ## Adjacency Graph (Ghana)
 
 ```{r adjacency-graph-plot, fig.height=8}
@@ -638,6 +627,8 @@ using the `loo` package.
 ## Stan Data Builders
 
 ```{r build-stan-data-cs}
+
+
 build_stan_data_cs <- function(iso, panels, spatial, year, covar_cols = NULL) {
   panel <- panels[[iso]] %>% filter(year == !!year)
   sp <- spatial[[iso]]
@@ -3147,10 +3138,6 @@ The reading rule for the table is the standard one of [@vehtari2017]: a
 difference in ELPD smaller than two standard errors of that difference is
 not detectable, and the simpler model in the comparison is preferred on
 parsimony grounds.
-
-
-
-# External Validation against the Malaria Atlas Project {#sec:map-validation}
 
 
 
