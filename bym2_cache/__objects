@@ -19,13 +19,13 @@ fit-icar	fit_icar	icar_code	mod_icar
 m1-icar-summary	
 fit-cross-sectional	fit_gha_cs	mod_cs
 m1-bym2-summary	
-m1-bym2-keyparams	available	base_names	keep	key_bym2_params
+m1-bym2-keyparams	
 loo-cv	bym2_loo_code	fit_bym2_loo	fit_gha_cs	fit_icar	fit_iid	loo_bym2	loo_comp	loo_df	loo_icar	loo_iid	loo_list	mod_bym2_loo	p_loo	safe_loo
 model-comparison-maps	D_gha_cs	get_prev	gha_shp	maps_comp	model_prev	p_comp	prev_bym2_v	prev_icar_v	prev_iid_v
 ppc-cs	y_obs_cs	y_rep_cs
 cs-trace	
 fit-spacetime-all	fit_st	iso	mod_st
-m2-summaries	cc	safe_full_summary	safe_print
+m2-summaries	cc	safe_print
 m2-key-params	cc	key_st_params
 summary-across-countries	summary_all
 prior-post	p_delta	p_mu	p_phi	p_sigb	p_siggam	post_draws	prior_post_plot
@@ -39,11 +39,11 @@ ci-comparison-obs-unobs	ci_all	make_ci_comparison	p_ci_box
 caterpillar-plot	ci_gha	p_cat
 direct-vs-smoothed	gha_direct	gha_model	gha_panel_r2	p_shrink	shrinkage_df
 st-diagnostics	
-unnamed-chunk-1	all_sf	bfa_sf	civ_sf	country_vec	cov_names	cross_border	D_all	D_bfa	D_civ	D_gha	edges	el	fit_pooled	gha_sf	i	j	K	mod_pooled	model_panel	N_obs	nb_all	nb_to_edgelist	NT	obs_idx	obs_mask	panel_pooled	Q	Q_scaled	remap_panel	scaling_factor_all	stan_data_pooled	within_country	X_pooled
+unnamed-chunk-1	all_sf	bfa_sf	civ_sf	country_vec	cov_names	cross_border	D_all	D_bfa	D_civ	D_gha	edges	el	gha_sf	i	j	K	mod_pooled	model_panel	N_obs	nb_all	nb_to_edgelist	NT	obs_idx	obs_mask	panel_pooled	Q	Q_scaled	remap_panel	scaling_factor_all	stan_data_pooled	within_country	X_pooled
 unnamed-chunk-2	beta_bar	beta_pooled	country_names	covar_labels	p_pooled_covars
 m3-pooled-summary	
-m3-pooled-key-params	key_pooled_params	safe_print
-m3-country-betas	cc	country_labels	cov_names_short	params	safe_print
+m3-pooled-key-params	
+m3-country-betas	beta_tab	country_labels	numc
 three-country-covariate-maps	country_borders	covar_map_df	full_panel	make_covar_map	p_all_covars	p_elev	p_ntl	p_pov	p_rain	p_temp	p_trav	panel_r2_cov
 nightlights-vs-prevalence	p_ntl_big	p_ntl_vs_prev	p_prev_big	pooled_map_df	pooled_prev_r2
 pooled-prevalence-map	p_pooled_map
@@ -63,4 +63,38 @@ r2-vs-full-covariates
 r2-vs-full-prevalence-r2	
 m4-r2-pooled-summary	
 m4-r2-pooled-key-params	
-m4-r2-country-betas	
+m4-r2-country-betas	numc	r2_beta_tab
+param-summary-helper	.tidy_param_table	DISTRICT_LEVEL	param_summary
+m4-edge-deletion-data	cc	compute_scaling_factor_subgraph	country_of_node	edge_country_a	edge_country_b	local_id	mask_cc	N_edges_within	n1_local	n2_local	node1_within	node2_within	nodes_cc	scaling_factor_per_district	sf_by_country	sfac_by_country	within_mask
+m4-edge-deletion-stan	
+m4-edge-deletion-fit	
+m4-edge-deletion-summary	
+m4-edge-deletion-compare	
+m4-edge-deletion-border-scatter	
+m3-m4-comparison	cov_names
+covariate-justification-table	covar_just	.bym2_cache/covariate-justification-table_dbd4651ec142c8e2c034ecce222dffc6_meta
+m3-stan-code	
+m3-build-data	obs_idx_r2	panel_r2	psi_r2	stan_data_r2	X_r2	y_r2
+m3-fit	
+m3-summary	fit_r2
+m4-stan-code	m4_stan_code
+m4-build-cy	panel_pooled_cy	year_lookup
+m4-stan-data	stan_data_m4_revised
+m4-fit	
+m4-summary	fit_m4_revised
+m4a-stan-code	m4a_stan_code
+m4a-fit	
+m4a-summary	fit_m4a
+m4a-beta-table	beta_4a	beta_4a_wide	country_names	cov_names	fit_m4a	parsed
+ed-data	
+ed-stan-code	ed_stan_code
+ed-fit	
+ed-summary	fit_edge_del
+m4b-stan-code	m4b_stan_code
+m4b-stan-data	
+m4b-fit	
+m4b-summary	fit_m4b
+sensitivity-loo-compare	cmp	cmp_df	fit	fit_name	loo_label	loo_obj	m4_family	nm_label	restore_to_global
+map-validation	
+setup-galway-bayesplot	
+m2-stan-code	m2_stan_code

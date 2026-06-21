@@ -25,3 +25,7 @@ stan_model_results.RData
 .RDataTmp*
 iid_null.rds
 .positai
+bym2_cache/
+data/
+output/
+report/

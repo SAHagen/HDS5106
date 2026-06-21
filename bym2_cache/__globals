@@ -7,42 +7,42 @@ build-panel
 adjacency-scaling	
 load-covariates	
 join-covariates	covariates_panel
-correlation-heatmap	covariates_panel
+correlation-heatmap	covariates_panel	galway_maroon	galway_ocean
 direct-est-dist	direct_est_all
-adjacency-graph-plot	district_lookups	districts_raw	spatial
+adjacency-graph-plot	district_lookups	districts_raw	galway_maroon	spatial
 build-stan-data-cs	
 build-stan-data-st	
 assemble-stan-data	build_stan_data_cs	build_stan_data_st	panels	spatial
 fit-iid	ensure_fit	stan_data
-m1-iid-summary	fit_iid
+m1-iid-summary	fit_iid	param_summary
 fit-icar	ensure_fit	sd_cs
-m1-icar-summary	fit_icar
+m1-icar-summary	fit_icar	param_summary
 fit-cross-sectional	ensure_fit	stan_data
 m1-bym2-summary	fit_gha_cs
-m1-bym2-keyparams	fit_gha_cs
-loo-cv	ensure_fit	sd_cs
-model-comparison-maps	districts_raw	fit_bym2_loo	fit_gha_cs	fit_icar	fit_iid	panels	stan_data
+m1-bym2-keyparams	fit_gha_cs	param_summary
+loo-cv	ensure_fit	galway_maroon	galway_ocean	galway_orange	sd_cs
+model-comparison-maps	districts_raw	fit_bym2_loo	fit_gha_cs	fit_icar	fit_iid	galway_grad	panels	stan_data
 ppc-cs	fit_gha_cs	stan_data
 cs-trace	fit_gha_cs
 fit-spacetime-all	ensure_fit	stan_data
-m2-summaries	fit_st
+m2-summaries	fit_st	param_summary
 m2-key-params	fit_st	safe_print
 summary-across-countries	fit_st
-prior-post	fit_st
-covariate-forest	summary_all
-prevalence-maps	district_lookups	districts_raw	fit_st	panels
-trend-deviation-map	district_lookups	districts_raw	fit_st
-top-deviation-districts	dev_summary_gha
-uncertainty-maps	district_lookups	districts_raw	fit_st	panels
-observed-unobserved-map	district_lookups	districts_raw	panels
-ci-comparison-obs-unobs	district_lookups	fit_st	panels	stan_data
-caterpillar-plot	ci_all
-direct-vs-smoothed	district_lookups	fit_st	model_prev	panels
+prior-post	fit_st	galway_ash	galway_maroon
+covariate-forest	galway_three	summary_all
+prevalence-maps	district_lookups	districts_raw	fit_st	galway_grad	panels
+trend-deviation-map	district_lookups	districts_raw	fit_st	galway_maroon	galway_ocean
+top-deviation-districts	dev_summary_gha	galway_maroon	galway_ocean
+uncertainty-maps	district_lookups	districts_raw	fit_st	galway_grad	panels
+observed-unobserved-map	district_lookups	districts_raw	galway_ocean	galway_orange	panels
+ci-comparison-obs-unobs	district_lookups	fit_st	galway_ocean	galway_orange	panels	stan_data
+caterpillar-plot	ci_all	galway_ocean	galway_orange
+direct-vs-smoothed	district_lookups	fit_st	galway_maroon	model_prev	panels
 st-diagnostics	fit_st
-unnamed-chunk-1	districts_raw	ensure_fit	panels
+unnamed-chunk-1	districts_raw	panels
 unnamed-chunk-2	fit_pooled
 m3-pooled-summary	fit_pooled
-m3-pooled-key-params	fit_pooled
+m3-pooled-key-params	fit_pooled	param_summary
 m3-country-betas	fit_pooled
 three-country-covariate-maps	all_sf
 nightlights-vs-prevalence	all_sf	country_borders	covar_map_df	fit_pooled	panel_pooled
@@ -61,6 +61,40 @@ r2-stan-fit
 r2-vs-full-spatial	fit_pooled
 r2-vs-full-covariates	fit_pooled
 r2-vs-full-prevalence-r2	fit_pooled	panel_pooled	prev_full
-m4-r2-pooled-summary	
+m4-r2-pooled-summary	param_summary
 m4-r2-pooled-key-params	
 m4-r2-country-betas	
+param-summary-helper	
+m4-edge-deletion-data	all_sf	D_all	el
+m4-edge-deletion-stan	
+m4-edge-deletion-fit	ensure_fit	N_edges_within	node1_within	node2_within	scaling_factor_per_district	stan_data_pooled
+m4-edge-deletion-summary	param_summary
+m4-edge-deletion-compare	fit_pooled
+m4-edge-deletion-border-scatter	D_all	el	fit_pooled	panel_pooled	within_mask
+m3-m4-comparison	fit_pooled
+covariate-justification-table	
+m3-stan-code	
+m3-build-data	country_vec	D_all	el	panel_pooled	scaling_factor_all	X_pooled
+m3-fit	ensure_fit	stan_data_r2
+m3-summary	param_summary	restore_fit
+m4-stan-code	
+m4-build-cy	iso	panel_pooled	survey_index
+m4-stan-data	panel_pooled_cy	stan_data_pooled
+m4-fit	ensure_fit	stan_data_m4_revised
+m4-summary	param_summary	restore_fit
+m4a-stan-code	
+m4a-fit	ensure_fit	stan_data_m4_revised
+m4a-summary	param_summary	restore_fit
+m4a-beta-table	restore_fit
+ed-data	all_sf	D_all	el
+ed-stan-code	
+ed-fit	ensure_fit	stan_data_m4_revised
+ed-summary	param_summary	restore_fit
+m4b-stan-code	
+m4b-stan-data	stan_data_m4_revised
+m4b-fit	ensure_fit
+m4b-summary	param_summary	restore_fit
+sensitivity-loo-compare	restore_fit
+map-validation	
+setup-galway-bayesplot	
+m2-stan-code	

@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(grep -i -E \"\\\\.png$\")",
-      "Bash(quarto --version)",
-      "Bash(quarto render *)"
-    ]
-  }
-}
