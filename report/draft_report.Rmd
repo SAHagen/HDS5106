@@ -1,0 +1,973 @@
+---
+title: |
+  Bayesian Small Area Estimation of Under-Five Malaria Prevalence
+  in West Africa
+subtitle: |
+  A Space-Time BYM2 Fay-Herriot Model Across Ghana, Burkina Faso
+  and Côte d'Ivoire
+authors:
+  - name: Godwill Zulu
+    affiliation: |
+      School of Mathematical and Statistical Sciences,
+      University of Galway, Galway, Ireland
+    email: g.zulu1@universityofgalway.ie
+  - name: Stewart Hagen
+    email: s.hagen1@universityofgalway.ie
+    affiliation: |
+      School of Mathematical and Statistical Sciences,
+      University of Galway, Galway, Ireland
+abstract: |
+
+keywords:
+  - small area estimation
+  - Bayesian hierarchical model
+  - BYM2 spatial prior
+  - Fay-Herriot
+  - malaria prevalence
+  - West Africa
+  - Demographic and Health Surveys
+bibliography: references.bib
+biblio-style: unsrtnat
+output:
+  rticles::arxiv_article:
+    citation_package: natbib
+header-includes:
+  - \usepackage[numbers]{natbib}
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{float}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{threeparttablex}
+  - \usepackage[normalem]{ulem}
+  - \usepackage{makecell}
+  - \usepackage{xcolor}
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{bm}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = FALSE,
+  message   = FALSE,
+  warning   = FALSE,
+  fig.align = "center",
+  fig.pos   = "H",
+  out.extra = "",
+  out.width = "70%"
+)
+library(knitr)
+library(kableExtra)
+```
+
+# Introduction
+\label{sec:intro}
+
+## Background
+
+Malaria remains one of the leading causes of childhood morbidity and mortality in sub-Saharan Africa. According to the World Malaria Report 2024 [@who2024malaria] there were an estimated 263 million cases of malaria and 579,000 deaths worldwide with the WHO Africa Region bearing the most burden, accounting for at least 94% of cases and 95% of deaths globally. Within the African Region, the burden falls heaviest on children under the age of 5, who account for roughly more than 75% of malaria deaths, which is three quarters of all malaria deaths despite representing only around 15 percent of the population [@who2024malaria]. Plasmodium falciparum dominates regional transmission and is sustained by the Anopheles gambiae and Anopheles funestus species complexes that occupy the climatic envelope of West Africa from the Sahel southwards through the Guinea zone [@bhatt2015; @weiss2020]. Both vectors are strongly anthropophilic and endophilic, they bite humans by preference and rest indoors after feeding, but they exploit different habitats: An. gambiae breeds in small, sunlit, temporary pools produced by seasonal rains, while An. funestus persists in vegetated, more permanent water bodies that smooth the seasonal trough in transmission [@sinka2010dominant]. Development of the parasite inside the mosquito is itself temperature-sensitive, falling away below roughly 18 °C [@gething2011modelling], which is why highland and plateau zones see lower vectorial capacity than the warmer plains around them.
+
+These constraints translate directly into the spatial pattern of risk this thesis aims to estimate. Elevation and rainfall together encode the climatic suitability of a district for the vectors and the parasite; in the Sahel the transmission season is compressed into the few months that follow the monsoon, which is the rationale for targeting seasonal malaria chemoprevention there rather than elsewhere [@cairns2012estimating; @who2012smc]. Night-time light radiance, used here as a proxy for urbanicity, captures the well-documented gradient by which urban districts have lower prevalence than rural ones: built surfaces displace breeding habitat, sanitation is denser, and human–vector contact is reduced [@hay2005urbanization]. Yet climate and land cover do not act alone. Two districts with identical environmental conditions can still differ in burden, because what matters is how often an infectious bite reaches a susceptible child and how quickly that child is treated. Housing quality is among the strongest socio-economic correlates of childhood malaria, children in homes with finished walls and closed eaves have roughly half the odds of infection of those in unimproved housing, an effect comparable to that of an ITN [@tusting2017housing; @tusting2019mapping] and is captured here, alongside asset and sanitation deprivation, through the multidimensional poverty index. Maternal literacy indexes the education gradient in care-seeking and adherence to chemoprevention regimens, while travel time to the nearest health facility approximates the practical accessibility of diagnosis and treatment, which translates not only into individual survival but, by clearing infectious reservoirs, into the local force of infection [@weiss2020]. Population density finally distinguishes the dense peri-urban districts from the sparsely populated rural districts in which most of the West African malaria burden is concentrated.
+
+The case for sub-national estimation is sharpened by the way the burden is distributed within countries. Districts only short distances apart can differ in prevalence by tens of percentage points, reflecting local variation in vector ecology, the length and intensity of the transmission season, intervention coverage and socioeconomic conditions [@bhatt2015; @weiss2020]. A national average, even when reported with a tight confidence interval, hides this heterogeneity entirely and is inadequate as a basis for targeting interventions or detecting reversals of progress before they become visible at higher aggregations. The World Health Organization's Global Technical Strategy for Malaria 2016–2030 explicitly identifies sub-national tailoring as a strategic priority [@who2023], and the High Burden to High Impact initiative has since made sub-national risk stratification a defining feature of national malaria control planning.
+
+The Demographic and Health Surveys (DHS) Programme provides the internationally standardised population-based source of childhood malaria infection data in sub-Saharan Africa. Since approximately 2010 the standard biomarker module has included an HRP2-based rapid diagnostic test (RDT) for Plasmodium falciparum, administered to children aged 6–59 months in a representative subset of sampled households [@florey2014; @croft2018]. The sampling design is stratified two-stage cluster, designed to produce reliable estimates at the regional (admin-1) level rather than at the district (admin-2) scale. At the district level, two problems therefore arise simultaneously. The first is incomplete coverage and the second is sampling instability: where a district is sampled, the estimate is typically based on a handful of clusters, so that the apparent geography of risk in the direct estimates can be dominated by survey noise rather than by signal.
+
+Small area estimation (SAE) is the established statistical response to both problems. The framework borrows information across small areas through structured priors and covariates, so that an estimate at one area is informed not only by its own sample but also by data from areas that resemble it [@rao2015]. Recent work by Wakefield, Mercer and colleagues has formalised area-level frameworks tailored to DHS-style cluster data, demonstrating that structured spatial and temporal priors can stabilise noisy district estimates while preserving the design-based uncertainty of the survey [@mercer2015; @wakefield2020]. These frameworks have been deployed at scale to estimate child mortality and disease prevalence across multiple sub-Saharan African countries [@wakefield2019], but the analyses overwhelmingly treat nations as independent entities.
+
+While a parallel tradition in malaria mapping uses unit-level geostatistics rather than area-level SAE, such as the continuous prevalence surfaces produced by the Malaria Atlas Project (MAP) [@gething2011; @bhatt2015; @weiss2020], the two approaches are complementary. Unit-level surfaces are continuous in space and well suited to environmental prediction, while area-level SAE produces estimates aligned with the administrative scale at which malaria control interventions are actually planned and delivered. For the policy purposes that motivate this work, the area-level approach is the more directly useful, and the MAP surfaces serve as an external benchmark to which we return in the Discussion.
+
+A defining methodological feature of the present work is its multi-country structure. The substantive argument for joining three countries on a single adjacency graph is strong: malaria transmission ecology does not respect national borders. The study countries share the same dominant P. falciparum parasite and the same Anopheles vectors [@who2023], the West African monsoon drives a regional July-to-October transmission peak [@bhatt2015], and seasonal labour migration disperses the parasite across borders [@gething2011]. Two adjacent districts on opposite sides of the Ghana–Burkina Faso border, for example, experience similar rainfall and substantial bidirectional movement, so the residual variation in prevalence after conditioning on the dominant ecological drivers ought to be at least as smooth across that frontier as it is across an internal district boundary [@weiss2020].
+
+At the same time, the temporal misalignment of the survey rounds complicates the cross-border case: the first DHS rounds in the three countries span four calendar years (Burkina Faso 2010, Côte d'Ivoire 2012, Ghana 2014), and a spatial smoother that treats cross-border edges in the first round as if they connected contemporaneous surfaces would conflate spatial with temporal variation [@saldarriaga2020]. This is the principal methodological tension that the modelling sequence in this report is designed to address. Through a series of multi-country and sensitivity specifications, we ask empirically whether accounting for cross-border dynamics produces better inferences than within-country alternatives, and whether the substantive conclusions depend on these cross-border edges.
+
+## Aims and Objectives
+
+The aim of this thesis is to develop a Bayesian hierarchical area-level small area estimation framework for under-five malaria prevalence across Ghana, Burkina Faso and Côte d'Ivoire over the 2010–2022 period. The framework is designed to produce district-level posterior estimates with calibrated uncertainty for every district and survey round, including those not directly sampled, while exploiting the multi-country structure of the data to empirically scrutinise the choice to model cross-border spatial dynamics.
+
+### Objectives
+
+The study pursues five specific objectives:
+
+\begin{enumerate}
+\item Construct a harmonised three-country district panel with consistent admin-2 boundaries across rounds, country-level and combined adjacency graphs, design-based direct prevalence estimates with calibrated sampling variances, and district-level covariates drawn from remote-sensed and census sources.
+\item Develop and validate a Bayesian Fay--Herriot framework by comparing a scaled BYM2 spatial prior against independent and identically distributed (IID) and pure intrinsic conditional autoregressive (ICAR) alternatives using a single-country cross-sectional baseline.
+\item Evaluate the value of multi-country spatial borrowing by comparing joint three-country specifications (both single-time and temporally varying) against independent country-specific models, to determine whether a shared adjacency preserves and refines country-level findings.
+\item Assess the robustness of the multi-country framework through formal sensitivity analyses testing time-varying covariate slopes, country-specific BYM2 hyperparameters, and the deletion of cross-border edges, using leave-one-out cross-validation to detect changes in expected predictive performance.
+\item Generate calibrated district-level posterior estimates of prevalence by country and round to serve as direct inputs for sub-national programme planning and intervention targeting.
+\end{enumerate}
+
+### Research questions
+
+The analysis is driven by three core research questions:
+
+\begin{enumerate}
+\item Does the BYM2 prior outperform IID and pure ICAR alternatives at the district scale for under-five malaria prevalence in a cross-sectional baseline, and what does this imply for the choice of spatial prior in subsequent multi-country space--time specifications?
+\item How have the prevalence trajectories of the three countries evolved between DHS rounds at a calendar-year scale, and how consistent are the temporal slopes derived from a joint multi-country model compared to those estimated independently per country?
+\item Are the conclusions regarding disease trajectories, covariate effects, and between-country heterogeneity robust to the principal structural assumptions of the multi-country framework, namely the time-invariance of covariate slopes, shared spatial hyperparameters across countries, and the inclusion of cross-border edges in the adjacency graph?
+\end{enumerate}
+
+
+# Methods
+\label{sec:methods}
+
+## Data
+
+### DHS data and outcome
+\label{sec:dhs}
+
+The primary data source is the DHS Programme [@croft2018]. We use the household member recode (PR) file from each survey, which records every de facto household member alongside the malaria submodule results. The outcome is the result of a rapid diagnostic test (RDT) for Plasmodium falciparum infection administered to children aged 6 to 59 months [@florey2014]. The DHS data are confidential and access requires a project application to the DHS Program, which the present project obtained; cluster GPS coordinates are randomly displaced (up to 2 km in urban areas, 5 km in rural areas, with 1 per cent of rural clusters displaced up to 10 km), and no individual-level data are reproduced in this document.
+
+Six DHS rounds are used in this study, two per country (Table \ref{tab:surveys}). The two rounds per country are separated by 8 to 11 calendar years; within-round fieldwork windows span the late wet-season and early dry-season months in each country.
+
+```{r surveys}
+surveys <- data.frame(
+  Country = c("Burkina Faso", "Burkina Faso",
+              "Côte d'Ivoire", "Côte d'Ivoire",
+              "Ghana", "Ghana"),
+  `Survey round` = c("DHS 2010", "DHS 2021",
+                     "DHS 2011-12", "DHS 2021",
+                     "DHS 2014", "DHS 2022"),
+  `Fieldwork window` = c("May 2010 to Jan 2011", "Nov 2021 to Mar 2022",
+                         "Dec 2011 to May 2012", "Sep 2021 to Dec 2021",
+                         "Sep 2014 to Dec 2014", "Oct 2022 to Jan 2023"),
+  `Districts sampled` = c(232, 153, 80, 103, 153, 124),
+  check.names = FALSE
+)
+knitr::kable(surveys,
+             caption = "DHS surveys used in this study, by country and round. \\label{tab:surveys}",
+             booktabs = TRUE) |>
+  kableExtra::kable_styling(latex_options = c("hold_position", "scale_down"),
+                            font_size = 8)
+```
+
+### District panel
+\label{sec:panel}
+
+District boundaries were obtained from GADM v4.1 and harmonised to the finest administrative geography at which malaria control programmes are implemented in each country: admin-2 for Ghana (260 districts), admin-3 for Burkina Faso (351 communes) and admin-3 for Côte d'Ivoire (113 departments), giving a combined panel of $N = 724$ districts across the three countries. Boundary changes between rounds were resolved through majority-area cross-walks. Spatial assignment of DHS clusters to districts uses the nearest-feature rule rather than strict point-in-polygon, to avoid mis-assignments arising from GPS displacement near borders.
+
+### Covariates
+\label{sec:covariates}
+
+Seven district-level covariates are included in the cross-border models, selected to capture the ecological and structural determinants of malaria transmission set out in Section \ref{sec:intro}. Table \ref{tab:covariates} summarises each covariate with its substantive mechanism, data source and primary reference. Continuous raster surfaces were aggregated to the district by population-weighted mean using WorldPop counts as the weighting surface, and values for each district-round were extracted over the actual DHS fieldwork months of that survey (Table \ref{tab:surveys}), so that seasonal variation in rainfall and temperature is encoded at the data level rather than through an explicit seasonality term. Each covariate was standardised to zero mean and unit variance prior to model fitting.
+
+```{r covariates}
+covar_table <- data.frame(
+  Covariate = c("Elevation",
+                "Rainfall",
+                "Temperature",
+                "Nighttime lights",
+                "Travel time",
+                "Pop. density",
+                "Poverty"),
+  Mechanism = c("Altitude lowers ambient temperature and slows parasite development inside Anopheles vectors.",
+                "Rainfall sustains vector breeding sites; wet-season totals are a standard environmental driver.",
+                "Temperature governs vector survival and the extrinsic incubation period; optimum near 25 C.",
+                "Urbanisation reduces larval habitat and improves housing and healthcare access.",
+                "Accessibility from major centres reflects the practical reach of interventions and treatment.",
+                "Density modifies effective transmission intensity and human-vector contact rates.",
+                "Household-level deprivation drives ITN ownership, care-seeking and housing quality."),
+  Source = c("SRTM 1km DEM",
+             "CHIRPS daily precip.",
+             "MODIS LST",
+             "VIIRS composite",
+             "Friction surface",
+             "WorldPop + shapefile",
+             "Census, district (GHA), region (BFA, CIV)"),
+  Reference = c("Bhatt et al. (2015)",
+                "Funk et al. (2015)",
+                "Bhatt et al. (2015)",
+                "Elvidge et al. (2021)",
+                "Weiss et al. (2020)",
+                "WHO (2023)",
+                "Florey (2014)"),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+knitr::kable(covar_table,
+             caption = "Covariates used in the cross-border models, the substantive mechanism for the malaria-prevalence relationship, the data source and the primary reference. \\label{tab:covariates}",
+             booktabs = TRUE, escape = FALSE) |>
+  kableExtra::kable_styling(latex_options = c("hold_position", "scale_down"),
+                            font_size = 7) |>
+  kableExtra::column_spec(2, width = "5.5cm")
+```
+
+\paragraph{Elevation (SRTM).}
+Altitude lowers ambient temperature and slows the sporogonic development of Plasmodium falciparum inside the mosquito [@gething2011modelling; @bhatt2015]. Taken from the SRTM 1 km digital elevation model and treated as time-invariant over the study window.
+
+\paragraph{Rainfall (CHIRPS).}
+Rainfall sustains the temporary, sunlit pools in which Anopheles gambiae s.l. breeds and shapes the regional north-to-south transmission gradient [@sinka2010dominant; @bhatt2015]. Taken from the CHIRPS daily product at 0.05° resolution [@funk2015] and averaged over the DHS fieldwork months of each round.
+
+\paragraph{Land surface temperature (MODIS LST).}
+Temperature governs adult vector survival and the duration of the extrinsic incubation period, with effective transmission falling away below roughly 18 °C [@gething2011modelling]. Taken from the MODIS LST 8-day composite at 1 km resolution and averaged over the DHS fieldwork months.
+
+\paragraph{Nighttime light radiance (VIIRS).}
+Nighttime lights proxy urbanicity, capturing the well-documented urban–rural prevalence gradient driven by reduced larval habitat, denser infrastructure and lower indoor human–vector contact [@hay2005urbanization; @tusting2019mapping]. Taken from the VIIRS Day/Night Band annual composite [@elvidge2021] for each survey year and log-transformed prior to standardisation.
+
+\paragraph{Travel time to the nearest health facility.}
+Travel time approximates the practical accessibility of diagnosis and treatment, which translates not only into individual survival but, by clearing infectious reservoirs, into the local force of infection [@weiss2020accessibility] . Taken from the global friction-surface travel-time map of [@weiss2020accessibility].
+
+\paragraph{Population density (WorldPop).}
+Population density modifies human–vector contact rates and complements the nightlights covariate by separating the crowding component from the urbanisation component. Computed from the WorldPop gridded 100-m population estimates [@tatem2017worldpop] divided by district land area and log-transformed prior to standardisation.
+
+\paragraph{Multidimensional poverty index.}
+MPI indexes the deprivation gradient that drives ITN ownership, care-seeking, housing quality and IRS acceptance [@tusting2017housing; @tusting2019mapping]. For Ghana, the district-level MPI was extracted from the Ghana Statistical Service StatsBank API [@florey2014]; for Burkina Faso (RGPH 2019) and Côte d'Ivoire (ENV 2015), MPI is published only at admin-1 level and the regional value was assigned uniformly to every district within the region, so the MPI slope for these two countries is identified by between-region variation. This regional-imputation caveat is revisited in Section \ref{sec:limitations}.
+
+## Direct estimation
+\label{sec:direct}
+
+For each sampled district $i$ in survey round $t$, the design-based direct estimate of malaria prevalence is the Hájek (weighted ratio) estimator
+\begin{equation}
+\hat{p}_{it} \;=\; \frac{\sum_{k \in S_{it}} w_k \, m_k}{\sum_{k \in S_{it}} w_k},
+\label{eq:hajek}
+\end{equation}
+where $S_{it}$ is the set of children sampled in district $i$ at round $t$, $w_k$ is the survey weight of child $k$ accounting for cluster and household selection probabilities, and $m_k \in \{0, 1\}$ is the child's RDT result. The Hájek form is preferred over the Horvitz–Thompson estimator because the denominator is itself estimated from the survey, which reduces variability when within-district sample sizes are small [@cochran1977; @lumley2010].
+
+The design-based sampling variance $\widehat{\mathrm{Var}}(\hat{p}_{it})$ is computed by Taylor-series linearisation around the ratio [@binder1983], with stratum and primary-sampling-unit information taken from the DHS recode files and supplied to a `svydesign` specification in R [@lumley2004]. Because malaria prevalence is bounded on the unit interval and the Fay–Herriot likelihood in Section \ref{sec:fh} requires a quantity on an unbounded real line, both the direct estimate and its variance are transferred to the logit scale. The logit-transformed estimate is
+\begin{equation}
+y_{it} \;=\; \mathrm{logit}(\hat{p}_{it}),
+\label{eq:logit}
+\end{equation}
+and the logit-scale sampling variance follows from the delta method,
+\begin{equation}
+\psi_{it}^{2} \;=\; \frac{\widehat{\mathrm{Var}}(\hat{p}_{it})}{\bigl[\hat{p}_{it}(1 - \hat{p}_{it})\bigr]^{2}},
+\label{eq:psi}
+\end{equation}
+following standard practice in area-level malaria and mortality SAE [@mercer2015; @wakefield2020]. Direct estimates of exactly zero or one are handled by a small continuity adjustment before the logit transform; districts with zero observed clusters in a round are flagged as unobserved and enter the model only through the spatial and covariate structure.
+
+The pair $(y_{it}, \psi_{it}^{2})$ summarises everything the DHS round contributes about district $i$ on the logit scale: $y_{it}$ is the design-based point estimate, $\psi_{it}^{2}$ its design-based variance treated as known by the modelling step that follows. The Hájek estimator and its design-based variance are well behaved when the per-district sample size is large and the design effect is moderate; at the district scale of these DHS surveys neither condition holds reliably, which motivates the model-based approach that follows. The empirical sample-size, coefficient-of-variation and aggregation patterns underlying this concern are presented in Section \ref{sec:results}.
+
+## Statistical framework
+\label{sec:framework}
+
+### The Fay–Herriot framework
+\label{sec:fh}
+
+We work within the area-level small area estimation framework of [@fay1979]. The framework has two components: a *sampling model* that links the design-based direct estimate to an unobserved latent quantity, and a *linking model* that specifies how the latent quantity depends on covariates and on a spatially structured residual. The sampling model is
+\begin{equation}
+y_{it} \mid \theta_{it} \;\sim\; \mathcal{N}\!\left( \theta_{it}, \; \psi_{it}^{2} \right),
+\label{eq:fh-lik}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $y_{it} = \mathrm{logit}(\hat{p}_{it})$, the logit-scale direct estimate from Section \ref{sec:direct};
+\item $\theta_{it} = \mathrm{logit}(p_{it})$, the latent logit-scale true prevalence (the unknown of interest);
+\item $\psi_{it}^{2}$, the design-based logit-scale sampling variance from equation \ref{eq:psi}, treated as known.
+\end{itemize}
+
+Treating $\psi_{it}^{2}$ as known is the defining modelling choice of the Fay–Herriot approach: the sampling variance is a property of the survey design (cluster count, weights, within-cluster homogeneity) and is encoded in the design metadata supplied with the recode files. With both $\psi_{it}^{2}$ and the model-based residual variance free, the parameters would be only weakly identified [@you2002; @rao2015]. We adopt the treated-as-known assumption throughout, including for lightly-sampled districts; smoothing $\psi_{it}^{2}$ via a generalised variance function [@rao2015] is a possible refinement we do not pursue here.
+
+The linking model specifies the structure of the latent surface $\theta_{it}$. It takes the generic form
+\begin{equation}
+\theta_{it} \;=\; \mu + \mathbf{x}_{it}^{\top} \bm{\beta} \;+\; b_i \;+\; (\text{time, country, interaction terms}),
+\label{eq:fh-link}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $\mu$, a global intercept on the logit scale;
+\item $\mathbf{x}_{it}$, the seven-vector of standardised covariates for district $i$ in round $t$, and $\bm{\beta}$ the corresponding slope vector;
+\item $b_i$, a district-level spatial random effect specified in Section \ref{sec:spatial};
+\item time, country and interaction terms that are zero in the cross-sectional baseline and that build up across the model sequence in Section \ref{sec:models}.
+\end{itemize}
+
+The full breakdown of the linear predictor is the point at which the model sequence branches: the cross-sectional baseline (Model 1) sets the time and country terms to zero and probes three alternative forms of $b_i$, while the subsequent multi-country specifications add country, time and interaction structure on top of a fixed BYM2 form for $b_i$.
+
+### Spatial structure: the adjacency graph, ICAR and BYM2 priors
+\label{sec:spatial}
+
+The district-level spatial random effect $b_i$ is specified through a prior on the joint distribution of $(b_1, \ldots, b_N)$ that encodes the substantive expectation of smoothness between neighbouring districts. The structure we use throughout the multi-country specifications is the BYM2 reparameterisation of [@riebler2016], which sits on an adjacency graph that we describe first.
+
+\paragraph{The adjacency graph.}
+A district-level adjacency graph encodes the qualitative neighbour relation across the panel of $N = 724$ districts. We construct three variants. The within-country graph $W_{\text{GHA}}$ over the 260 Ghanaian districts is used by the Model 1 cross-sectional baseline. The combined within-country graph stacks the three country-only graphs on the same 724-node set, producing three disconnected components, and is used by the country-specific BYM2 sensitivity (Model 4b) and by the edge-deletion sensitivity. The principal multi-country specification (Models 3 and 4) uses the *cross-border* graph $W$, which extends the combined graph by adding edges between districts on opposite sides of an international border that share a land frontier. Cross-border edges were identified manually from harmonised admin-2/admin-3 polygons. The cross-border graph $W$ has $E = 2{,}056$ edges in total: 1,978 within-country edges and 78 cross-border edges.
+
+The cross-border edges are the structural feature that makes this work a multi-country specification rather than a stack of three independent country models. Their substantive motivation is set out in Section \ref{sec:intro}: malaria transmission ecology does not respect political boundaries, the West African monsoon drives a regional wet-season transmission peak that propagates across the three countries [@bhatt2015], and seasonal labour migration disperses parasites across borders [@gething2011]. Two districts that face each other across a national border share rainfall, temperature, vector ecology and human movement, so the residual variation in prevalence after adjustment for covariates ought to be at least as smooth across the border as it is across an internal district boundary [@weiss2020]. Whether the cross-border edges actually buy predictive performance in practice is the empirical question that the edge-deletion sensitivity (Section \ref{sec:models}) addresses.
+
+\paragraph{ICAR prior.}
+The intrinsic conditional autoregressive (ICAR) prior of [@besag1991] is the canonical prior for a smooth spatial field on a graph. For a vector $u = (u_1, \ldots, u_N)^{\top}$ on the node set of an adjacency matrix $W$, the ICAR density is
+\begin{equation}
+p(u \mid W) \;\propto\; \exp\!\left( -\tfrac{1}{2} \sum_{(i, j) \in E(W)} (u_i - u_j)^{2} \right),
+\label{eq:icar}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $W$, the $N \times N$ adjacency matrix with $W_{ij} = 1$ if districts $i$ and $j$ are neighbours and $0$ otherwise;
+\item $E(W)$, the set of edges of $W$ (i.e., the pairs $(i, j)$ with $W_{ij} = 1$);
+\item $u_i$, the structured spatial random effect at district $i$.
+\end{itemize}
+
+The ICAR density is improper because it is invariant to a constant shift in $u$; identifiability is restored by the sum-to-zero constraint $\sum_i u_i = 0$. For graphs with multiple disconnected components, such as the combined within-country graph, the sum-to-zero constraint is applied per component [@freni2018].
+
+\paragraph{BYM2 prior.}
+The pure ICAR specification forces all residual spatial variation to be structured; the pure IID specification forces it all to be unstructured. The BYM2 reparameterisation of [@riebler2016] combines the two into a single mixture with an interpretable marginal scale,
+\begin{equation}
+b_i \;=\; \sigma_b \left( \sqrt{1 - \phi} \; v_i + \sqrt{\phi / s} \; u_i \right),
+\label{eq:bym2}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $\sigma_b > 0$, the marginal standard deviation of the spatial random effect on the logit scale;
+\item $\phi \in [0, 1]$, the mixing parameter that governs the balance between structured and unstructured variation: $\phi = 0$ recovers a pure IID prior, $\phi = 1$ recovers a pure ICAR prior, and intermediate values are a mixture;
+\item $v_i \sim \mathcal{N}(0, 1)$ independently across districts, the unstructured component;
+\item $u_i \sim \mathrm{ICAR}(W)$ as in equation \ref{eq:icar}, the structured component;
+\item $s$, a scaling factor computed from the generalised inverse of the ICAR structure matrix so that $\sigma_b$ has a consistent marginal-SD interpretation regardless of the adjacency structure [@riebler2016]. For graphs with disconnected components the scaling factor is computed per component [@freni2018; @donegan2021].
+\end{itemize}
+
+Treating $\phi$ as an unknown parameter lets the data determine the mixture rather than imposing one or the other [@morris2019]. The BYM2 prior is the standard form used in Models 2 through 4 below; the Model 1 cross-sectional baseline compares it to its two limiting cases (pure IID and pure ICAR).
+
+## Model sequence
+\label{sec:models}
+
+The notation is shared throughout: $i$ indexes districts, $t \in \{1, 2\}$ indexes survey rounds, $c \in \{1, 2, 3\}$ indexes countries ($c = 1$ Ghana, $c = 2$ Côte d'Ivoire, $c = 3$ Burkina Faso), and $k$ indexes the seven covariates. The notation $c[i]$ denotes the country containing district $i$. All models share the Fay–Herriot sampling model (equation \ref{eq:fh-lik}); they differ only in the linear predictor for $\theta_{it}$ and, in the cross-sectional baseline, in the form of the spatial random effect.
+
+### Model 1: Cross-sectional Ghana baseline
+\label{sec:m1}
+
+Model 1 fits the Fay–Herriot framework to Ghana 2022 alone (a single country, a single round), in three variants that share the same likelihood and the same covariate component but differ only in the form of the district-level spatial random effect. The shared linear predictor is
+\begin{equation}
+\theta_i \;=\; \mu + \mathbf{x}_i^{\top} \bm{\beta} + b_i,
+\label{eq:m1}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $\mu$, the Ghana 2022 grand mean on the logit scale;
+\item $\mathbf{x}_i$, the standardised seven-covariate vector for district $i$ at the 2022 round, and $\bm{\beta}$ the corresponding seven-vector of slopes;
+\item $b_i$, the district-level spatial residual, whose three competing forms define the variants.
+\end{itemize}
+
+The covariate component $\mathbf{x}_i^{\top} \bm{\beta}$ is identical across the three variants; only the residual structure $b_i$ changes.
+
+\paragraph{IID variant.} The residual is fully unstructured noise,
+\begin{equation}
+b_i \;\sim\; \mathcal{N}(0, \sigma_b^{2}),
+\label{eq:m1-iid}
+\end{equation}
+with $\sigma_b > 0$ the residual standard deviation. Two neighbouring districts share no information beyond the covariates.
+
+\paragraph{Pure ICAR variant.} The residual is fully spatially structured,
+\begin{equation}
+b_i \;\sim\; \mathrm{ICAR}(W_{\text{GHA}}),
+\label{eq:m1-icar}
+\end{equation}
+with $W_{\text{GHA}}$ the within-Ghana adjacency matrix over the 260 Ghanaian districts and the sum-to-zero identifiability constraint as in equation \ref{eq:icar}. Information flows between neighbours but unstructured residual variation at the district scale is forced to zero.
+
+\paragraph{BYM2 variant.} The residual is the mixture form of equation \ref{eq:bym2},
+\begin{equation}
+b_i \;=\; \sigma_b \left( \sqrt{1 - \phi} \; v_i + \sqrt{\phi / s_{\text{GHA}}} \; u_i \right),
+\label{eq:m1-bym2}
+\end{equation}
+with $u_i \sim \mathrm{ICAR}(W_{\text{GHA}})$, $v_i \sim \mathcal{N}(0, 1)$, and $s_{\text{GHA}}$ the scaling factor computed on $W_{\text{GHA}}$. The mixing parameter $\phi$ is estimated from the data.
+
+The substantive purpose of Model 1 is to determine empirically which form of the spatial residual the data support, before fixing the form for the multi-country specifications that follow. The three variants are compared in Section \ref{sec:results}.
+
+### Model 2: Single-country space–time
+\label{sec:m2}
+
+Model 2 extends Model 1 to both DHS rounds within a single country and is fitted independently for each of the three countries. For country $c$, the linear predictor is
+\begin{equation}
+\theta_{it} \;=\; \mu_c + \mathbf{x}_{it}^{\top} \bm{\beta}_c + b_i + \delta_c \, \widetilde{\text{yr}}_{it} + \gamma_{it},
+\label{eq:m2}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $\mu_c$, the country-$c$ intercept on the logit scale, identified as the prevalence at $\widetilde{\text{yr}} = 0$;
+\item $\mathbf{x}_{it}$, the seven-covariate vector for district $i$ at round $t$ (now time-varying for rainfall, temperature, nighttime lights and population density), and $\bm{\beta}_c$ the country-$c$ slope vector;
+\item $b_i$, the BYM2 spatial residual on the within-country adjacency $W_c$ (equation \ref{eq:bym2}), shared across both rounds for district $i$;
+\item $\widetilde{\text{yr}}_{it} = \text{yr}_{it} - 2016$, the calendar year of survey $t$ in district $i$ centred at the regional midpoint 2016;
+\item $\delta_c$, the country-$c$ annual rate of change in logit prevalence;
+\item $\gamma_{it} \sim \mathcal{N}(0, \sigma_\gamma^{2})$, an unstructured space–time interaction following the Type I classification of [@knorrheld2000].
+\end{itemize}
+
+Fitting Model 2 separately for each country provides the within-country benchmark against which the multi-country specifications are compared.
+
+### Model 3: Three-country single-time
+\label{sec:m3}
+
+Model 3 is the first multi-country specification. It joins all three countries on the cross-border adjacency graph $W$ from Section \ref{sec:spatial}, but uses only the temporally aligned second survey round (Burkina Faso 2021, Côte d'Ivoire 2021, Ghana 2022). With every district surveyed within a one-year window, cross-border smoothing operates on contemporaneous surfaces by construction. The linear predictor is
+\begin{equation}
+\theta_i \;=\; \mu + \alpha_{c[i]} + \mathbf{x}_i^{\top} \bm{\beta}_{c[i]} + b_i,
+\label{eq:m3}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $\mu$, the regional grand mean on the logit scale;
+\item $\alpha_c$, the country-$c$ deviation from the regional mean, identified by the sum-to-zero constraint $\sum_c \alpha_c = 0$;
+\item $\mathbf{x}_i$ and $\bm{\beta}_c$, district-level covariates and country-specific slopes; the slopes are partially pooled across countries through the hierarchical prior $\beta_{c, k} \sim \mathcal{N}(\bar{\beta}_k, \tau_k^{2})$ [@gelman2006];
+\item $b_i$, the BYM2 spatial residual on the cross-border graph $W$ (equation \ref{eq:bym2}), with shared hyperparameters $(\sigma_b, \phi)$ across the three countries.
+\end{itemize}
+
+```{r combined-W, fig.cap = "Combined 724-district adjacency graph. The network illustrates within-country connections (blue) and cross-border edges (highlighted in red). Rather than treating political borders as impermeable boundaries, this joint spatial weight matrix ($W$) enables the cross-border borrowing of strength. Consequently, information flows directly between neighboring districts across the three-country region, allowing the BYM2 hyperparameters to be shared globally. \\label{fig:m1-maps}"}
+knitr::include_graphics("three_country_adjacency.png")
+```
+
+The shared BYM2 hyperparameters and the cross-border edges of $W$ together encode the multi-country structure: information flows between districts on opposite sides of an international border, and the marginal scale of residual spatial variation is assumed common across the three countries.
+
+### Model 4: Three-country two-time
+\label{sec:m4}
+
+Model 4 extends Model 3 to both DHS rounds. The temporal effect enters as a country-specific linear slope on the centred calendar year:
+\begin{equation}
+\theta_{it} \;=\; \mu + \alpha_{c[i]} + \mathbf{x}_{it}^{\top} \bm{\beta}_{c[i]} + b_i + \delta_{c[i]} \, \widetilde{\text{yr}}_{it} + \gamma_{it},
+\label{eq:m4}
+\end{equation}
+with components
+
+\begin{itemize}
+\item $\mu, \alpha_c, \bm{\beta}_c$ as in Model 3;
+\item $b_i$, BYM2 on the cross-border graph $W$, time-invariant within a district (a single spatial surface is assumed to describe the residual spatial gradient across both rounds);
+\item $\widetilde{\text{yr}}_{it} = \text{yr}_{it} - 2016$, the centred calendar year of survey $t$ in district $i$;
+\item $\delta_c$, the country-$c$ annual rate of change in logit prevalence, with the country-level hierarchical prior $\delta_c \sim \mathcal{N}(\bar{\delta}, \sigma_\delta^{2})$;
+\item $\gamma_{it} \sim \mathcal{N}(0, \sigma_\gamma^{2})$, unstructured space–time interaction (Type I, [@knorrheld2000]).
+\end{itemize}
+
+Two notes on parameterisation. First, the temporal effect is expressed on calendar-year scale rather than as a round-to-round wave indicator because the surveys are not synchronised across countries (Round 1 spans 2010 to 2014, Round 2 spans 2021 to 2022): a wave indicator would conflate the country-specific elapsed time between rounds with the country-specific rate of change [@wakefield2020]. The between-round odds ratio for country $c$ is recovered as $\exp(\delta_c \cdot \Delta \text{yr}_c)$ where $\Delta \text{yr}_c$ is the actual elapsed years between rounds. Second, $b_i$ is time-invariant rather than time-varying: the dominant structural drivers of residual spatial variation (long-run climate, elevation, the durable component of urbanisation, accessibility) move on decadal timescales [@bhatt2015; @weiss2020], and with only two rounds per district a per-round spatial field $b_{i, t}$ is not separately identified from a saturated round-by-district interaction.
+
+### Sensitivity specifications
+\label{sec:sens}
+
+Three sensitivity variants probe the structural assumptions of Model 4.
+
+\paragraph{Model 4a (country-year covariate slopes).}
+Model 4a relaxes the time-invariance of the covariate slopes by allowing the covariate–prevalence relationship to differ between rounds within each country,
+\begin{equation}
+\theta_{it} \;=\; \mu + \alpha_{c[i]} + \mathbf{x}_{it}^{\top} \bm{\beta}_{c[i], t} + b_i + \delta_{c[i]} \, \widetilde{\text{yr}}_{it} + \gamma_{it},
+\label{eq:m4a}
+\end{equation}
+with $\beta_{c, t, k} \sim \mathcal{N}(\bar{\beta}_k, \tau_k^{2})$. This is the country-by-year interaction specification: within each country the covariate slopes are free to differ by round; across the six country-rounds the slopes are partially pooled toward a single regional mean per covariate. With only two rounds per district, country-by-year is the finest interaction supportable here.
+
+\paragraph{Model 4b (country-specific BYM2).}
+Model 4b replaces the shared BYM2 hyperparameters of Model 4 with country-specific ones [@donegan2021]. The cross-border edges are removed from the adjacency graph (the model reverts to the disconnected combined graph), and each country gets its own $\sigma_{b, c}$ and $\phi_c$:
+\begin{equation}
+b_i \;=\; \sigma_{b, c[i]} \left( \sqrt{1 - \phi_{c[i]}} \; v_i + \sqrt{\phi_{c[i]} / s_{c[i]}} \; u_i \right),
+\label{eq:m4b}
+\end{equation}
+with $u$ ICAR on the within-country adjacency $W'$, per-country sum-to-zero $\sum_{i \in c} u_i = 0$, and per-country scaling factor $s_c$. The substantive question is whether the three countries have materially different residual spatial structures once the cross-border edges are removed.
+
+\paragraph{Edge-deletion sensitivity.}
+The edge-deletion sensitivity isolates the contribution of the 78 cross-border edges by removing them and refitting Model 4 with all other features (covariate slopes, country intercepts, temporal slopes, shared BYM2 hyperparameters) unchanged. The scaling factor is computed per component and applied per district [@freni2018]. Comparing the fit with and without the cross-border edges directly quantifies what cross-border smoothing buys, both for predictive performance and for the substantive parameter estimates (country slopes, regional covariate effects).
+
+## Priors
+\label{sec:priors}
+
+Weakly informative priors are used throughout, with the priors on the spatial standard deviation following the penalised-complexity (PC) framework of [@simpson2017]. The shared prior specification across the cross-border models is given in Table \ref{tab:priors}.
+
+```{r priors}
+priors <- data.frame(
+  Parameter = c("$\\mu$",
+                "$\\alpha_c$ (free)",
+                "$\\sigma_b$",
+                "$\\phi$",
+                "$\\sigma_\\gamma$",
+                "$\\bar\\beta_k$",
+                "$\\tau_k$",
+                "$\\bar\\delta$",
+                "$\\sigma_\\delta$"),
+  Prior = c("$\\mathcal{N}(-1.85,\\, 1.5^2)$",
+            "$\\mathcal{N}(0,\\, 1.5^2)$",
+            "$\\mathrm{Exp}(4.6)$",
+            "$\\mathrm{Beta}(3,\\, 2)$",
+            "$\\mathrm{Exp}(2)$",
+            "$\\mathcal{N}(0,\\, 1)$",
+            "$\\mathrm{Exp}(2)$",
+            "$\\mathcal{N}(0,\\, 0.5^2)$",
+            "$\\mathrm{Exp}(5)$"),
+  Rationale = c("Centred on logit of moderate paediatric prevalence",
+                "Identifies free elements under sum-to-zero",
+                "PC prior, $P(\\sigma_b > 1) \\approx 0.01$",
+                "Mild preference for structured component",
+                "PC prior on space-time interaction SD",
+                "Weakly informative on standardised covariates",
+                "PC prior on between-country slope SD",
+                "Tight on regional annual rate of change",
+                "PC prior on between-country slope variation"),
+  Source = c("Gelman (2006)",
+             "Gelman (2006)",
+             "Simpson et al. (2017)",
+             "Morris et al. (2019)",
+             "Simpson et al. (2017)",
+             "Gelman (2006)",
+             "Simpson et al. (2017)",
+             "Wakefield et al. (2020)",
+             "Simpson et al. (2017)"),
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+knitr::kable(priors,
+             format = "latex",
+             caption = "Prior distributions for the shared parameters across the cross-border models. \\label{tab:priors}",
+             booktabs = TRUE,
+             escape = FALSE) |>
+  kableExtra::kable_styling(latex_options = c("hold_position"), font_size = 8)
+```
+
+## Computation and diagnostics
+\label{sec:compute}
+
+All models were fitted in Stan version 2.34 [@stan2024] via the `cmdstanr` interface, using the No-U-Turn Sampler [@hoffman2014]. Four chains were run in parallel with 1,500 warmup and 2,000 sampling iterations each. Cross-sectional and country-level models used `adapt_delta = 0.99` and `max_treedepth = 14`; cross-border models used `adapt_delta = 0.97` and `max_treedepth = 13`. Convergence was assessed by the rank-normalised $\hat{R}$ of [@vehtari2021], bulk and tail effective sample sizes, the number of divergent transitions reported by the sampler, and visual inspection of trace, rank and pairs plots. Non-centred parameterisations were used for all hierarchical components to mitigate funnel geometry [@betancourt2015].
+
+# Results
+\label{sec:results}
+
+This section reports the posterior summaries from the seven model fits. The narration moves through the same sequence as the methods: the Model 1 cross-sectional baseline on Ghana with three variants of the spatial prior; the country-level Model 2 fits for Ghana, Burkina Faso and Côte d'Ivoire; the three-country single-time Model 3; the three-country two-time Model 4; and the three sensitivity specifications (Model 4a, Model 4b and the edge-deletion fit). Posterior summaries are given as posterior median followed by the 90 per cent credible interval in brackets. Convergence diagnostics are reported alongside each fit.
+
+Throughout this section the seven covariates are labelled, in order, as elevation ($\beta_1$), rainfall ($\beta_2$), nighttime lights ($\beta_3$), temperature ($\beta_4$), travel time to the nearest population centre ($\beta_5$), log population density ($\beta_6$) and multidimensional poverty ($\beta_7$). All covariates are standardised within country to unit variance and zero mean prior to model fitting, so each coefficient is interpreted as the change in logit-prevalence per one-standard-deviation change in the covariate.
+
+## 4.1 Direct estimates and coverage
+
+Coverage of the panel varies substantially by country and round. In Ghana, 153 of 260 districts contained at least one DHS cluster in 2014 and 124 of 260 in 2022. In Burkina Faso, 232 of 351 districts in 2010 and 153 of 351 in 2021. In Côte d'Ivoire, 80 of 113 districts in 2012 and 103 of 113 in 2021. Across the six surveys, 845 of the 1,448 district-round combinations are observed, leaving 603 to be filled by the model. The distribution of logit-scale design-based standard errors $\widehat{\psi}$ is right-skewed in every country-round, with country-round medians between 0.31 and 0.62 and a small number of districts above 1.5. The direct national prevalence estimates, computed as survey-weighted averages across observed clusters, are 19.7 per cent for Ghana 2014, 13.9 per cent for Ghana 2022, 65.5 per cent for Burkina Faso 2010, 17.2 per cent for Burkina Faso 2021, 24.8 per cent for Côte d'Ivoire 2012 and 26.4 per cent for Côte d'Ivoire 2021. These values are within Monte Carlo error of the model-based national prevalences reported in the sections that follow.
+
+## 4.2 Model 1: cross-sectional Ghana baseline
+
+The three Model 1 variants on the Ghana 2022 cross-section converged cleanly. Across all three fits, the rank-normalised $\hat{R}$ statistic is at or below 1.024 for every reported parameter, and bulk effective sample sizes are between 200 (the lowest, for the ICAR variant's $\sigma_b$) and 2,200, well above the conventional thresholds for reliable posterior summarisation. No divergent transitions were reported in any of the three fits.
+
+```{r cross-params}
+m1 <- data.frame(
+  Parameter = c("$\\mu$ [90\\% CrI]", "$\\sigma_b$ [90\\% CrI]", "$\\phi$ [90\\% CrI]"),
+  IID = c("-1.82 [-2.02, -1.63]", "0.66 [0.58, 0.77]", "-"),
+  ICAR = c("-1.72 [-1.95, -1.49]", "2.65 [2.30, 3.03]", "-"),
+  BYM2 = c("-1.82 [-2.02, -1.62]", "0.85 [0.68, 1.15]", "0.45 [0.17, 0.72]"),
+  check.names = FALSE
+)
+
+knitr::kable(m1,
+             format = "latex", # Explicitly set format here
+             caption = "Model 1 (Ghana 2022 cross-section) posterior estimates of structural parameters. Posterior median with 90 per cent credible intervals. \\label{tab:m1-params}",
+             booktabs = TRUE, 
+             escape = FALSE) |>
+  kableExtra::kable_styling(latex_options = c("hold_position"), font_size = 8)
+```
+
+The posterior estimates of the structural parameters are presented in Table 4. The global intercept $\mu$ is similar across the three variants, with posterior medians of $-1.82$ (IID), $-1.72$ (ICAR) and $-1.82$ (BYM2) on the logit scale, corresponding to an implied national prevalence near 14 per cent. The marginal spatial standard deviation $\sigma_b$ differs sharply across the three variants. The IID model places $\sigma_b$ at $0.66$ ($[0.58, 0.77]$), the ICAR model at $2.65$ ($[2.30, 3.03]$), and the BYM2 model at $0.85$ ($[0.68, 1.15]$). The very large ICAR estimate is interpretable: when the model is forced to attribute every residual deviation to the structured component, it has to inflate the spatial standard deviation to absorb the substantial unstructured noise in the data. The BYM2 mixing parameter $\phi$ is $0.44$ ($[0.17, 0.72]$), indicating that roughly half of the residual spatial variation in the Ghana 2022 cross-section after conditioning on covariates is geographically structured and half is district-specific noise.
+
+
+
+```{r m1-maps, fig.cap = "Model 1 estimated under-five malaria prevalence for Ghana 2022: direct estimates (top-left), IID (top-right), ICAR (bottom-left), BYM2 (bottom-right). Districts with no observed clusters are shown in white in the direct panel and filled by the model in the model-based panels. \\label{fig:m1-maps}"}
+knitr::include_graphics("model_comparison_maps_ghana.png")
+```
+
+The covariate effects are broadly consistent across the three variants and credibly identify two of the seven coefficients under the BYM2 fit. Travel time has a positive effect ($\beta_5 = 0.21$, $[0.06, 0.35]$) and log population density a positive effect at the edge of credibility ($\beta_6 = 0.34$, with the 90 per cent CrI ranging from $-0.05$ to $0.72$). Nighttime lights ($\beta_3$) and temperature ($\beta_4$) have negative point estimates but credible intervals that span zero. Elevation, rainfall and poverty have credible intervals comfortably overlapping zero in the BYM2 fit. The implied national paediatric prevalence from the BYM2 fit is $14.1$ per cent ($[11.8, 16.5]$), consistent with the direct national estimate of $13.9$ per cent reported above. The Ghana 2022 fits return a population-prevalence figure close to the direct estimate without forcing it through the prior.
+
+```{r cross-loo}
+sens <- data.frame(
+  Model = c("BYM2",
+            "IID",
+            "ICAR"),
+  `ELPD diff` = c(0.0, -1.6, -6.4),
+  `SE diff` = c(0.0, 1.6, 4.1),
+  ELPD = c(-106.5, -108.0, -112.8),
+  `SE(ELPD)` = c(7.8, 7.7,9.3),
+  `p_loo`= c(7.8, 7.7, 9.3),
+  check.names = FALSE
+)
+knitr::kable(sens,
+             caption = "Leave-one-out cross-validation across Ghana Baseline models. ELPD difference is computed against the best model; differences smaller than two standard errors are not statistically distinguishable from zero \\citep{vehtari2017}. \\label{tab:sens-loo}",
+             booktabs = TRUE, escape = FALSE) |>
+  kableExtra::kable_styling(latex_options = c("hold_position"), font_size = 8)
+```
+
+The leave-one-out cross-validation comparison across the three variants is reported in Table 5. The BYM2 variant achieves the best expected log predictive density at $-106.5$ (SE $7.8$), with the IID variant at $\Delta\text{ELPD} = -1.6$ (SE $1.6$) and the pure ICAR variant at $\Delta\text{ELPD} = -6.4$ (SE $4.1$). The pure ICAR variant is the worst of the three by a margin larger than its standard error: forcing every district residual through the structured component carries a measurable predictive cost. The BYM2 and IID variants are within one standard error of one another in ELPD, so the data alone do not strongly prefer BYM2 over IID on predictive grounds. We retain BYM2 for the subsequent models because the BYM2 form contains the IID specification as the $\phi = 0$ limit (so choosing it costs nothing in predictive terms relative to IID), and only the structured component of BYM2 allows an unobserved district to borrow from its neighbours, which is the purpose of the framework. The Ghana 2022 baseline therefore establishes that the BYM2 prior is empirically well-supported at district scale and is the appropriate working choice for the country-level and three-country specifications that follow.
+
+
+## 4.3 Model 2: country-level space-time
+
+Model 2 was fitted independently to each country with the calendar-year parameterisation. The fits converged with all rank-normalised $\hat{R}$ values at or below 1.027 across the three country fits, and bulk effective sample sizes in the hundreds to thousands for every reported parameter. The lowest bulk effective sample size across the three fits is 155 (for $\sigma_b$ in the Burkina Faso fit, where the marginal spatial standard deviation is the largest of the three countries and the geometry is the most challenging to sample), still well above the threshold for reliable estimation of posterior medians. No divergent transitions were reported in any of the three fits.
+
+```{r spacetime-params}
+m2_combined <- data.frame(
+  Parameter = c(
+    "\\textbf{Space-Time Structure}",
+    "~~$\\mu$ (Intercept)",
+    "~~$\\sigma_b$ (Spatial variance)",
+    "~~$\\phi$ (Spatial mixing)",
+    "~~$\\sigma_\\gamma$ (Temporal variance)",
+    "~~$\\delta$ (Linear time trend)",
+    "~~$\\delta_{R2-R1}$ (Log-odds shift: R2 vs R1)",
+    "~~Odds Ratio (Round 2 vs 1)",
+    "\\textbf{Covariates (Fixed Effects)}",
+    "~~$\\beta_1$",
+    "~~$\\beta_2$",
+    "~~$\\beta_3$",
+    "~~$\\beta_4$",
+    "~~$\\beta_5$",
+    "~~$\\beta_6$",
+    "~~$\\beta_7$",
+    "\\textbf{National Prevalence}",
+    "~~$p_{national}$ (Round 1)",
+    "~~$p_{national}$ (Round 2)"
+  ),
+  GHA = c(
+    "",
+    "-1.11 [-1.21, -1.01]",
+    "0.16 [0.01, 0.47]",
+    "0.63 [0.26, 0.91]",
+    "0.73 [0.66, 0.80]",
+    "-0.14 [-0.17, -0.12]",
+    "-1.15 [-1.33, -0.95]",
+    "0.32 [0.26, 0.39]",
+    "",
+    "-0.10 [-0.20, 0.01]",
+    "0.15 [-0.09, 0.39]",
+    "-0.28 [-0.53, -0.02]",
+    "-0.22 [-0.34, -0.10]",
+    "0.18 [0.08, 0.28]",
+    "0.13 [-0.13, 0.40]",
+    "0.19 [0.03, 0.34]",
+    "",
+    "0.33 [0.32, 0.35]",
+    "0.15 [0.14, 0.16]"
+  ),
+  BFA = c(
+    "",
+    "-0.46 [-0.55, -0.38]",
+    "0.61 [0.13, 1.02]",
+    "0.72 [0.34, 0.93]",
+    "0.75 [0.65, 0.84]",
+    "-0.24 [-0.27, -0.22]",
+    "-2.67 [-2.94, -2.36]",
+    "0.07 [0.05, 0.09]",
+    "",
+    "-0.10 [-0.22, 0.03]",
+    "0.05 [-0.12, 0.24]",
+    "-0.12 [-0.19, -0.06]",
+    "0.07 [-0.18, 0.29]",
+    "0.04 [-0.07, 0.15]",
+    "-0.25 [-0.37, -0.14]",
+    "0.05 [-0.03, 0.14]",
+    "",
+    "0.70 [0.69, 0.71]",
+    "0.19 [0.18, 0.21]"
+  ),
+  CIV = c(
+    "",
+    "-1.22 [-1.32, -1.11]",
+    "0.19 [0.01, 0.61]",
+    "0.64 [0.27, 0.91]",
+    "0.68 [0.59, 0.77]",
+    "0.09 [0.05, 0.12]",
+    "0.79 [0.47, 1.10]",
+    "2.20 [1.60, 3.01]",
+    "",
+    "-0.15 [-0.37, 0.08]",
+    "-0.07 [-0.25, 0.11]",
+    "-0.37 [-0.52, -0.23]",
+    "-0.17 [-0.39, 0.05]",
+    "-0.17 [-0.29, -0.06]",
+    "-0.13 [-0.28, 0.03]",
+    "0.09 [-0.08, 0.26]",
+    "",
+    "0.22 [0.21, 0.24]",
+    "0.31 [0.30, 0.32]"
+  ),
+  check.names = FALSE
+)
+
+# Render the table
+knitr::kable(m2_combined,
+             format = "latex", 
+             col.names = c("Parameter", "Ghana (GHA)", "Burkina Faso (BFA)", "Côte d'Ivoire (CIV)"),
+             caption = "Model 2 (country-level space-time) posterior median estimates with 90\\% credible intervals [90\\% CrI] for Ghana, Burkina Faso, and Côte d'Ivoire. \\label{tab:m2-params-all}",
+             booktabs = TRUE, 
+             escape = FALSE,
+             align = c("l", "c", "c", "c")) |>
+  kableExtra::kable_styling(latex_options = c("hold_position"), font_size = 8) |>
+  kableExtra::add_indent(c(2:8, 10:16, 18:19)) # Updated indent index to account for the new row
+```
+
+The three countries follow strikingly different trajectories between rounds. In Ghana, the global intercept is $\mu = -1.11$ ($[-1.21, -1.01]$), the calendar-year slope is $\delta = -0.143$ ($[-0.167, -0.119]$) per year, and the implied between-round logit shift over the eight-year window between the 2014 and 2022 surveys is $\delta_{R2-R1} = -1.15$ ($[-1.33, -0.95]$), giving a between-round odds ratio of $0.32$ ($[0.26, 0.39]$). The implied national prevalence falls from $33.3$ per cent ($[31.7, 34.9]$) in Round 1 to $14.8$ per cent ($[13.5, 16.1]$) in Round 2. In Burkina Faso, the global intercept is $\mu = -0.46$ ($[-0.55, -0.38]$), the calendar-year slope is steeper at $\delta = -0.242$ ($[-0.268, -0.215]$) per year, and the implied between-round logit shift over the eleven-year window between 2010 and 2021 is $\delta_{R2-R1} = -2.67$ ($[-2.94, -2.36]$), giving a between-round odds ratio of $0.07$ ($[0.05, 0.09]$). The implied national prevalence falls from $69.6$ per cent ($[68.5, 70.7]$) in Round 1 to $19.3$ per cent ($[17.9, 20.8]$) in Round 2. Côte d'Ivoire moves in the opposite direction. The global intercept is $\mu = -1.22$ ($[-1.32, -1.11]$), the calendar-year slope is positive at $\delta = +0.087$ ($[0.052, 0.122]$) per year, and the implied between-round logit shift over the nine-year window between 2012 and 2021 is $\delta_{R2-R1} = +0.79$ ($[0.47, 1.10]$), giving a between-round odds ratio of $2.20$ ($[1.60, 3.01]$). The implied national prevalence rises from $22.4$ per cent ($[20.9, 24.1]$) in Round 1 to $31.0$ per cent ($[29.7, 32.4]$) in Round 2. The contrast between two countries in rapid retreat and a third moving against the regional tide is the central empirical finding of this section, and the sections below show it to be robust to how the data are modelled jointly.
+
+
+The spatial parameters tell a complementary story. The marginal spatial standard deviation $\sigma_b$ is well identified for Burkina Faso at $0.61$ ($[0.13, 1.02]$), reflecting the country's pronounced north-to-south transmission gradient. The Ghana and Côte d'Ivoire estimates are much smaller at $0.16$ ($[0.01, 0.47]$) and $0.19$ ($[0.01, 0.61]$) respectively, and their lower 90 per cent bounds reach close to zero, indicating that after conditioning on covariates the residual spatial heterogeneity at district scale in these two countries is modest. The mixing parameter $\phi$ is close to two thirds in all three countries, with posterior medians of $0.63$ in Ghana, $0.72$ in Burkina Faso and $0.64$ in Côte d'Ivoire, indicating that between a half and roughly three quarters of the residual spatial variation is geographically structured in each. The Knorr-Held Type I interaction standard deviation $\sigma_\gamma$ is consistent across countries at around $0.7$ logit units (Ghana $0.73$; Burkina Faso $0.75$; Côte d'Ivoire $0.68$). This indicates a meaningful amount of unstructured district-time variation that survives conditioning on the spatial, temporal and covariate terms; in absolute terms it is larger than the marginal spatial standard deviation in Ghana and Côte d'Ivoire, which says that within those two countries the district-time-level variation around national trajectories is at least as large as the time-invariant spatial residual structure.
+
+The covariate effects in Model 2 are country-specific and identify a pattern of mostly protective effects with some heterogeneity across the three countries. In Ghana, log population density is positive but the credible interval narrowly excludes zero in only one direction ($\beta_6 = 0.13$, $[-0.13, 0.40]$); travel time is credibly positive ($\beta_5 = 0.18$, $[0.08, 0.28]$); temperature is credibly negative ($\beta_4 = -0.22$, $[-0.34, -0.10]$); and poverty is credibly positive ($\beta_7 = 0.19$, $[0.03, 0.34]$). In Burkina Faso, only nighttime lights ($\beta_3 = -0.12$, $[-0.19, -0.06]$) and log population density ($\beta_6 = -0.25$, $[-0.37, -0.14]$) have credible intervals excluding zero, and both are negative, consistent with the protective effect of urbanisation. In Côte d'Ivoire, four covariates have credible intervals excluding zero: nighttime lights ($\beta_3 = -0.37$, $[-0.52, -0.23]$), travel time ($\beta_5 = -0.17$, $[-0.29, -0.06]$), with temperature ($\beta_4 = -0.17$, $[-0.39, 0.05]$) and elevation ($\beta_1 = -0.15$, $[-0.37, 0.08]$) borderline. The nighttime-lights coefficient is consistently negative across all three countries (and most credibly so in Côte d'Ivoire), which is the most stable covariate-prevalence relationship in Model 2 and is a finding the three-country specifications will sharpen further through partial pooling.
+
+What the country-level Model 2 cannot do is share information across borders or pull a regional consensus out of the covariate effects. Côte d'Ivoire in particular, with the smallest district count, has the widest credible intervals on the spatial parameters and would benefit most from borrowing. The three-country models that follow address this, beginning with the temporally aligned single-time model.
+
+## 4.4 Model 3: three-country single-time
+
+Model 3 fits the second survey rounds of all three countries (Burkina Faso 2021, Côte d'Ivoire 2021, Ghana 2022) on the combined 724-district adjacency graph including the 78 cross-border edges. The fit converged cleanly. The structural parameters from Model 3 establish three things relevant to what follows. The combined-graph spatial standard deviation is well identified and the country deviations $\alpha_c$ order as expected, with Burkina Faso highest, Côte d'Ivoire intermediate and Ghana lowest after accounting for the global intercept. The regional covariate means $\bar{\beta}_k$ from the hierarchical pooling pick out nighttime lights as the strongest protective regional effect. The pooled posterior is consistent with the cross-border specification on temporally aligned data and serves as the structural baseline for the two-time Model 4.
+
+## 4.5 Model 4: three-country two-time, calendar year
+
+Model 4 extends Model 3 to both rounds with country-specific linear slopes on the centred calendar year. The fit converged with rank-normalised $\hat{R}$ values at or below $1.028$ for all top-level parameters and bulk effective sample sizes between $118$ (the lowest, for $\alpha_3$, where the country intercept is being identified jointly with the global mean under the sum-to-zero constraint) and $7,452$. The structural and country-specific posterior summaries are presented in your Model 4 family Table.
+
+The global intercept is $\mu = -1.14$ ($[-1.33, -0.95]$) on the logit scale. The marginal spatial standard deviation is $\sigma_b = 0.66$ ($[0.40, 0.91]$), substantially larger than any of the country-level $\sigma_b$ estimates from Model 2, and the mixing parameter is $\phi = 0.85$ ($[0.57, 0.96]$), substantially higher than any of the country-level $\phi$ estimates. Two features of this comparison are worth pulling out. First, the larger $\sigma_b$ reflects that, on the combined 724-district graph, the spatial residual is being asked to absorb not only within-country heterogeneity but also between-country structure that the country intercepts $\alpha_c$ do not fully capture. Second, the high $\phi$ indicates that the residual spatial variation is predominantly structured; the shared BYM2 field, operating across the combined graph with cross-border edges, attributes more of the residual to the structured component than any of the country-level fits did. The country deviations are $\alpha_1 = 0$ (reference, Ghana), $\alpha_2 = 0.04$ ($[-0.26, 0.36]$, Côte d'Ivoire) and $\alpha_3 = 0.67$ ($[0.36, 0.98]$, Burkina Faso). The sum-to-zero identification places the country deviations against the global mean rather than against one another, and Burkina Faso's $\alpha_3$ is the most strongly identified, reflecting its much higher Round 1 prevalence.
+
+The country-specific calendar-year slopes recover the three trajectories on a per-year scale. Ghana's slope is $\delta_1 = -0.143$ ($[-0.166, -0.120]$) per year, Côte d'Ivoire's is $\delta_2 = +0.080$ ($[0.049, 0.110]$) per year, and Burkina Faso's is $\delta_3 = -0.230$ ($[-0.255, -0.206]$) per year, all tightly identified. The slopes translate to between-round odds ratios using each country's actual elapsed years: $0.32$ ($[0.27, 0.38]$) for Ghana (over eight years), $2.09$ ($[1.56, 2.70]$) for Côte d'Ivoire (over nine years), and $0.08$ ($[0.06, 0.10]$) for Burkina Faso (over eleven years). These are within Monte Carlo error of the country-level Model 2 odds ratios, so the temporal reparameterisation preserves the between-round comparison exactly while replacing it with a per-year rate of change directly comparable across countries with different elapsed windows. The regional mean of the slopes is $\bar{\delta} = -0.09$ ($[-0.29, 0.11]$), with the credible interval spanning zero, and the between-country slope standard deviation is $\sigma_\delta = 0.18$ ($[0.09, 0.43]$). The regional mean credibly overlapping zero is informative: the three countries genuinely differ in their direction of travel rather than sharing a common regional trend, and Model 4 captures this through $\sigma_\delta$ rather than collapsing it onto $\bar{\delta}$. The implied national prevalences for the three countries match Model 2 to two decimal places.
+
+
+
+The regional covariate means $\bar{\beta}_k$ identify nighttime lights as the strongest single protective covariate with $\bar{\beta}_3 = -0.19$ ($[-0.43, 0.00]$), followed by log population density at $\bar{\beta}_6 = -0.19$ ($[-0.38, 0.08]$), temperature at $\bar{\beta}_4 = -0.14$ ($[-0.35, 0.10]$), and elevation at $\bar{\beta}_1 = -0.12$ ($[-0.26, 0.04]$). Rainfall, travel time and poverty have regional credible intervals that span zero comfortably. The between-country covariate-slope standard deviations $\tau_k$ are between $0.11$ (for elevation and poverty) and $0.22$ (for travel time), indicating that country-specific covariate effects do not differ enormously around their respective regional means once the data from the three countries are pooled into the hierarchical structure. The Knorr-Held Type I interaction standard deviation is $\sigma_\gamma = 0.71$ ($[0.66, 0.76]$), comparable to the country-level Model 2 values and reflecting that joint estimation has not concentrated the unstructured space-time variation.
+
+Three substantive features of the Model 4 results stand out. The country-specific trajectories from Model 2 are preserved and slightly tightened by the joint fit; the regional covariate pattern identifies nighttime lights, population density and temperature as the dominant structural protective factors at the regional scale; and the spatial residual after conditioning on covariates and country intercepts is predominantly structured ($\phi = 0.85$), consistent with the substantive expectation that residual variation reflects unmeasured but spatially smooth determinants such as vector ecology, intervention history and housing quality.
+
+## 4.6 Sensitivity analyses
+
+We assess three structural relaxations of Model 4: time-varying covariate slopes (Model 4a), country-specific BYM2 hyperparameters (Model 4b), and removal of cross-border edges from the adjacency graph (edge-deletion). All three are fitted to the same 1,448 district-round observations, so leave-one-out cross-validation is directly comparable across them.
+
+```{r model4all-params}
+m4_trimmed <- data.frame(
+  Parameter = c(
+    "\\textbf{Intercept \\& Variances}",
+    "~~$\\mu$ (Global Intercept)",
+    "~~$\\sigma_\\gamma$ (Temporal variance)",
+    "~~$\\sigma_\\delta$ (Time trend variance)",
+    "\\textbf{Spatial Parameters}",
+    "~~$\\sigma_b$ (Global spatial variance)",
+    "~~$\\sigma_b[1]$",
+    "~~$\\sigma_b[2]$",
+    "~~$\\sigma_b[3]$",
+    "~~$\\phi$ (Global spatial mixing)",
+    "~~$\\phi[1]$",
+    "~~$\\phi[2]$",
+    "~~$\\phi[3]$",
+    "\\textbf{Country Effects ($\\alpha$)}",
+    "~~$\\alpha_1$",
+    "~~$\\alpha_2$",
+    "~~$\\alpha_3$",
+    "\\textbf{Time Effects ($\\delta$)}",
+    "~~$\\bar{\\delta}$ (Global time trend)",
+    "~~$\\delta_1$",
+    "~~$\\delta_2$",
+    "~~$\\delta_3$",
+    "\\textbf{Covariate Effects ($\\bar{\\beta}$)}",
+    "~~$\\bar{\\beta}_1$",
+    "~~$\\bar{\\beta}_2$",
+    "~~$\\bar{\\beta}_3$",
+    "~~$\\bar{\\beta}_4$",
+    "~~$\\bar{\\beta}_5$",
+    "~~$\\bar{\\beta}_6$",
+    "~~$\\bar{\\beta}_7$"
+  ),
+  M4_Base = c(
+    "",
+    "-1.14 [-1.33, -0.95]",
+    "0.71 [0.66, 0.76]",
+    "0.18 [0.09, 0.43]",
+    "",
+    "0.66 [0.40, 0.91]",
+    "-",
+    "-",
+    "-",
+    "0.85 [0.57, 0.96]",
+    "-",
+    "-",
+    "-",
+    "",
+    "0.00 [0.00, 0.00]",
+    "0.04 [-0.26, 0.36]",
+    "0.67 [0.36, 0.98]",
+    "",
+    "-0.09 [-0.29, 0.11]",
+    "-0.14 [-0.17, -0.12]",
+    "0.08 [0.05, 0.11]",
+    "-0.23 [-0.26, -0.21]",
+    "",
+    "-0.12 [-0.26, 0.04]",
+    "-0.01 [-0.20, 0.20]",
+    "-0.19 [-0.43, 0.00]",
+    "-0.14 [-0.35, 0.10]",
+    "0.02 [-0.24, 0.26]",
+    "-0.19 [-0.38, 0.08]",
+    "0.08 [-0.05, 0.23]"
+  ),
+  M4a_TimeVarying = c(
+    "",
+    "-1.15 [-1.34, -0.96]",
+    "0.70 [0.64, 0.75]",
+    "0.18 [0.09, 0.43]",
+    "",
+    "0.71 [0.45, 0.95]",
+    "-",
+    "-",
+    "-",
+    "0.86 [0.63, 0.96]",
+    "-",
+    "-",
+    "-",
+    "",
+    "0.00 [0.00, 0.00]",
+    "0.04 [-0.26, 0.37]",
+    "0.67 [0.34, 1.01]",
+    "",
+    "-0.10 [-0.29, 0.11]",
+    "-0.14 [-0.16, -0.11]",
+    "0.08 [0.05, 0.10]",
+    "-0.23 [-0.25, -0.21]",
+    "",
+    "-0.13 [-0.23, -0.02]",
+    "-0.02 [-0.17, 0.13]",
+    "-0.17 [-0.27, -0.08]",
+    "-0.14 [-0.27, 0.02]",
+    "0.01 [-0.10, 0.12]",
+    "-0.21 [-0.32, -0.07]",
+    "0.07 [-0.02, 0.17]"
+  ),
+  M4b_CountryBYM2 = c(
+    "",
+    "-1.02 [-1.27, -0.42]",
+    "0.72 [0.67, 0.77]",
+    "0.18 [0.09, 0.41]",
+    "",
+    "-",
+    "0.13 [0.01, 0.39]",
+    "0.11 [0.01, 0.40]",
+    "0.66 [0.41, 0.96]",
+    "-",
+    "0.62 [0.25, 0.90]",
+    "0.63 [0.26, 0.91]",
+    "0.72 [0.37, 0.92]",
+    "",
+    "0.00 [0.00, 0.00]",
+    "-0.51 [-2.15, 0.95]",
+    "0.64 [-0.94, 2.37]",
+    "",
+    "-0.10 [-0.29, 0.11]",
+    "-0.14 [-0.17, -0.12]",
+    "0.08 [0.05, 0.11]",
+    "-0.23 [-0.26, -0.21]",
+    "",
+    "-0.12 [-0.25, 0.02]",
+    "0.02 [-0.16, 0.22]",
+    "-0.21 [-0.46, 0.02]",
+    "-0.14 [-0.32, 0.12]",
+    "0.01 [-0.25, 0.26]",
+    "-0.17 [-0.38, 0.11]",
+    "0.09 [-0.05, 0.24]"
+  ),
+  M4_EdgeDeletion = c(
+    "",
+    "-0.68 [-1.32, 0.27]",
+    "0.73 [0.67, 0.78]",
+    "0.18 [0.09, 0.44]",
+    "",
+    "0.50 [0.25, 0.72]",
+    "-",
+    "-",
+    "-",
+    "0.79 [0.46, 0.95]",
+    "-",
+    "-",
+    "-",
+    "",
+    "0.00 [0.00, 0.00]",
+    "-0.24 [-2.55, 1.51]",
+    "-0.06 [-1.94, 0.82]",
+    "",
+    "-0.09 [-0.29, 0.10]",
+    "-0.14 [-0.17, -0.12]",
+    "0.08 [0.05, 0.11]",
+    "-0.23 [-0.26, -0.21]",
+    "",
+    "-0.11 [-0.25, 0.03]",
+    "0.00 [-0.19, 0.20]",
+    "-0.19 [-0.43, 0.02]",
+    "-0.12 [-0.35, 0.13]",
+    "0.01 [-0.23, 0.24]",
+    "-0.19 [-0.37, 0.09]",
+    "0.09 [-0.06, 0.25]"
+  ),
+  check.names = FALSE
+)
+
+# Render the table
+knitr::kable(m4_trimmed,
+             format = "latex", 
+             col.names = c("Parameter", "Model 4 (Base)", "Model 4a (Time-Varying)", "Model 4b (Country BYM2)", "Model 4 (Edge Deletion)"),
+             caption = "Posterior median estimates with 90\\% credible intervals [90\\% CrI] across four variants of Model 4. \\label{tab:m4-all-variants}",
+             booktabs = TRUE, 
+             escape = FALSE,
+             align = c("l", "c", "c", "c", "c")) |>
+  kableExtra::kable_styling(latex_options = c("scale_down", "hold_position"), font_size = 7) |>
+  kableExtra::add_indent(c(2:4, 6:13, 15:17, 19:22, 24:30))
+```
+
+### 4.6.1 Model 4a: time-varying covariate slopes
+
+Model 4a allows country-specific covariate slopes to differ between rounds. The fit converged with rank-normalised $\hat{R}$ values at or below $1.018$ for all top-level parameters and bulk effective sample sizes between $141$ and $6,942$. The structural parameters are essentially unchanged from Model 4. The global intercept is $\mu = -1.15$ ($[-1.34, -0.96]$), the marginal spatial standard deviation is $\sigma_b = 0.71$ ($[0.45, 0.95]$), the mixing parameter is $\phi = 0.86$ ($[0.63, 0.96]$), and the Knorr-Held Type I standard deviation is $\sigma_\gamma = 0.70$ ($[0.64, 0.75]$). The country-specific calendar-year slopes are $\delta_1 = -0.137$ ($[-0.163, -0.111]$) for Ghana, $\delta_2 = +0.076$ ($[0.047, 0.104]$) for Côte d'Ivoire, and $\delta_3 = -0.232$ ($[-0.254, -0.210]$) for Burkina Faso, all within Monte Carlo error of the Model 4 estimates. The regional covariate means $\bar{\beta}_k$ are slightly tighter than in Model 4, with nighttime lights at $\bar{\beta}_3 = -0.17$ ($[-0.27, -0.08]$) now credibly excluding zero, log population density at $\bar{\beta}_6 = -0.21$ ($[-0.32, -0.07]$) credibly negative, and elevation at $\bar{\beta}_1 = -0.13$ ($[-0.23, -0.02]$) also credibly negative. The between-country covariate-slope standard deviations $\tau_k$ are slightly smaller than in Model 4, with most posterior medians between $0.05$ and $0.12$, consistent with the additional Round 2-versus-Round 1 flexibility absorbing some of the heterogeneity that the time-invariant Model 4 had to channel through $\tau$. The 42 country-time-specific covariate slopes themselves are largely consistent between rounds for the same country-covariate pair, with the largest changes seen in the Ghana temperature and Ghana log population density slopes; in both cases the Round 2 credible intervals widen and the between-round change is well within Monte Carlo noise.
+
+### 4.6.2 Model 4b: country-specific BYM2 components
+
+Model 4b replaces the shared BYM2 hyperparameters with country-specific ones on the disconnected within-country adjacency graphs. This is the most challenging fit of the seven for the sampler, and the diagnostics reflect it. The rank-normalised $\hat{R}$ for the country deviations reaches $1.291$ ($\alpha_2$) and $1.398$ ($\alpha_3$), and the bulk effective sample sizes for these two parameters are $11$ and $9$ respectively, well below the threshold for reliable inference on their posterior medians. The global intercept $\mu$ has $\hat{R} = 1.145$ and bulk effective sample size 20. These diagnostics indicate that Model 4b struggles to identify the global intercept and the country deviations jointly, because removing the cross-border edges weakens the cross-country anchoring of these parameters and the sum-to-zero identification on $\alpha$ then carries a much larger share of the work. The substantive parameters of interest, on the other hand, are well sampled: the country-specific calendar-year slopes are $\delta_1 = -0.142$ ($[-0.166, -0.120]$), $\delta_2 = +0.080$ ($[0.050, 0.108]$) and $\delta_3 = -0.229$ ($[-0.255, -0.205]$), all with bulk effective sample sizes in the thousands and $\hat{R}$ at or near $1.00$; and the regional covariate means $\bar{\beta}_k$ are similarly well sampled with bulk effective sample sizes between $2{,}700$ and $4{,}300$.
+
+The country-specific spatial standard deviations are $\sigma_{b,1} = 0.13$ ($[0.01, 0.39]$) for Ghana, $\sigma_{b,2} = 0.11$ ($[0.01, 0.40]$) for Côte d'Ivoire, and $\sigma_{b,3} = 0.66$ ($[0.41, 0.96]$) for Burkina Faso. Burkina Faso's spatial standard deviation is the only one of the three credibly identified away from zero; the Ghana and Côte d'Ivoire posteriors have 5 per cent lower bounds at $0.007$ and $0.008$ respectively, indicating that almost all of their residual spatial variation in the combined panel can be explained by the country intercept and covariates and very little is left for the BYM2 field to absorb. This is consistent with the country-level Model 2 spatial standard deviations and tells us that Burkina Faso carries the dominant share of residual spatial structure in the three-country panel. The country-specific mixing parameters are $\phi_1 = 0.62$ ($[0.25, 0.90]$) for Ghana, $\phi_2 = 0.63$ ($[0.26, 0.91]$) for Côte d'Ivoire and $\phi_3 = 0.72$ ($[0.37, 0.92]$) for Burkina Faso, all above one half and pointing to predominantly structured residual variation in every country once the global mean and country intercepts are removed.
+
+### 4.6.3 Edge-deletion sensitivity
+
+The edge-deletion specification removes the $78$ cross-border edges from the combined graph and refits Model 4 on the resulting disconnected three-component graph, with the BYM2 hyperparameters held shared across the three countries and the per-component scaling factor recomputed. As with Model 4b, the diagnostics show that some of the model-level identification weakens when cross-border smoothing is removed. The global intercept $\mu$ has $\hat{R} = 1.342$ and bulk effective sample size $10$; the country deviations $\alpha_2$ and $\alpha_3$ have $\hat{R}$ of $1.506$ and $1.392$ and bulk effective sample sizes of $8$ and $9$. The substantive parameters of interest are again well sampled: the country-year slopes have bulk effective sample sizes in the thousands and $\hat{R}$ at or near $1.00$, as do the regional covariate means.
+
+The substantive estimates from the edge-deletion fit are stable. The country-year slopes are $\delta_1 = -0.141$ ($[-0.165, -0.118]$), $\delta_2 = +0.079$ ($[0.049, 0.110]$) and $\delta_3 = -0.233$ ($[-0.256, -0.210]$), essentially identical to Model 4 within Monte Carlo noise. The regional covariate effects are within Monte Carlo error of Model 4, with nighttime lights at $\bar{\beta}_3 = -0.19$ ($[-0.43, 0.02]$) and log population density at $\bar{\beta}_6 = -0.19$ ($[-0.37, 0.09]$). The marginal spatial standard deviation drops from $\sigma_b = 0.66$ to $\sigma_b = 0.50$ ($[0.25, 0.72]$), reflecting that some of the spatial variation previously absorbed by cross-border smoothing is redistributed into the unstructured Gaussian term, the country intercepts and the now weakly identified global intercept. The mixing parameter remains high at $\phi = 0.79$ ($[0.46, 0.95]$).
+
+
+
+The key inferential point from the edge-deletion sensitivity is that the substantive parameters of interest, namely the country-year slopes, the regional covariate effects and the between-country slope variation, are stable to removing the cross-border edges, while the absolute level parameters ($\mu$, $\alpha_2$, $\alpha_3$) become weakly identified. The cross-border edges in Model 4 are doing identification work for the level parameters, but the data-driven findings about trajectories, covariate effects and between-country heterogeneity do not depend on them. This is a useful negative result: investigators making slightly different modelling choices about whether to include cross-border edges would arrive at substantively the same conclusions about how the three countries' prevalence have moved between rounds and which covariates carry the dominant regional signal.
+
+### 4.6.4 LOO-CV comparison across the cross-border specifications
+
+Table 6 reports the leave-one-out cross-validation comparison across the four cross-border specifications. Model 4a achieves the best expected log predictive density at $-465.2$ (SE $21.2$). Model 4 trails Model 4a by $3.4$ ELPD units against a standard error of the difference of $4.9$ ($0.7$ standard errors), the edge-deletion specification trails by $2.3$ units against $4.9$ ($0.5$ standard errors), and Model 4b trails by $5.9$ units against $5.3$ ($1.1$ standard errors). All four specifications are within roughly six ELPD units of one another against standard errors of around five, and none of the three structural relaxations of Model 4 produces a detectable improvement in expected predictive performance. The pareto-smoothed importance sampling estimates of effective parameters ($p_\text{loo}$) cluster around $591$ to $595$ for the four fits, reflecting that all four operate at comparable model complexity in the LOO sense.
+
+```{r sens-loo}
+sens <- data.frame(
+  Model = c("Model 4a (time-varying betas)",
+            "Edge-deletion (within-country only)",
+            "Model 4 (shared BYM2, full graph)",
+            "Model 4b (country-specific BYM2)"),
+  `ELPD diff` = c(0.0, -2.3, -3.4, -5.9),
+  `SE diff` = c(0.0, 4.9, 4.9, 5.3),
+  ELPD = c(-465.2, -467.5, -468.6, -471.2),
+  `SE(ELPD)` = c(21.2, 21.3, 21.1, 21.5),
+  `p_loo`= c(591.2, 593.1, 594.3, 594.9),
+  check.names = FALSE
+)
+knitr::kable(sens,
+             caption = "Leave-one-out cross-validation across the cross-border two-time models. ELPD difference is computed against the best model; differences smaller than two standard errors are not statistically distinguishable from zero \\citep{vehtari2017}. \\label{tab:sens-loo}",
+             booktabs = TRUE, escape = FALSE) |>
+  kableExtra::kable_styling(latex_options = c("hold_position"), font_size = 8)
+```
+
+Model 4 is therefore retained as the working three-country two-time specification on parsimony grounds. Model 4a is preferred by point ELPD, but the difference is well within one standard error and Model 4 with its time-invariant covariate slopes is the simpler model. Model 4b is preferred by neither parsimony nor ELPD; while it identifies Burkina Faso's distinctive spatial structure, it does so at the cost of much weakened identification of the country intercepts. The edge-deletion specification offers neither a predictive nor a parsimony advantage and weakens identification of the level parameters substantially.
+
+```{r trace_plots, fig.cap = " Trace Plots for model diagnostics showing convergence of the 4 chains for Ghana space-time model\\label{fig:trace-plots}"}
+knitr::include_graphics("trace_plots.png")
+```
+
+# Discussion
+\label{sec:discussion}
+
+
+
+## Limitations and weaknesses
+\label{sec:limitations}
+
+Access to clean district-level census data for the social covariates was possible only for Ghana, where the Ghana Statistical Service publishes admin-2 poverty and education figures from the 2010 and 2021 censuses. For Burkina Faso and Cote d'Ivoire no equivalent admin-2 census source was available within the timeframe of the project, and the social covariate used in the multi-country specifications is the subnational Multidimensional Poverty Index published on the Humanitarian Data Exchange by the Oxford Poverty and Human Development Initiative. This index is published at the regional (admin-1) level for both countries, so every district within a region carries the same value, and within-region variation in poverty is absorbed into the spatial random effect rather than into the poverty coefficient. It is also itself a derived indicator computed from DHS and MICS surveys rather than a census measurement, so the covariate carries its own modelling uncertainty that the Fay-Herriot framework treats as if it were observed without error. The DHS RDT outcome is based on detection of the *Plasmodium falciparum* HRP2 antigen, and *pfhrp2/3* gene deletions have been documented in West Africa with rising prevalence; what we estimate is RDT-positive prevalence, which may diverge from true infection prevalence where these deletions are common.
+
+The sampling variance $\psi_{it}^2$ is treated as known and fixed at its design-based estimate, following the standard Fay-Herriot convention [@fay1979; @you2002]. For districts with very few clusters this design-based estimate is itself uncertain, and the framework does not propagate that uncertainty; smoothing the variance through a generalised variance function would relax the assumption but was not implemented here. The BYM2 spatial field is also assumed time-invariant in Models 3, 4, 4a and 4b. The dominant ecological drivers of the regional gradient move on decadal timescales and a single field is substantively defensible, but with only two rounds the data cannot strongly test the assumption, and Knorr-Held Type II and higher interactions that would let the spatial structure evolve are not separately identified [@knorrheld2000; @goicoa2018].
+
+The covariate set captures structural and environmental determinants of transmission but does not include intervention coverage. Insecticide-treated net distribution, indoor residual spraying, intermittent preventive treatment in pregnancy and seasonal malaria chemoprevention are spatially and temporally heterogeneous across the three countries, so their omission means the model describes the between-round trajectories without being able to attribute them to specific intervention rollouts. This is most consequential for Burkina Faso, where the rollout of seasonal malaria chemoprevention in the Sahel from 2014 onwards is the most likely proximate driver of the steep decline observed between 2010 and 2021. The most coherent district-level source of intervention coverage for all three countries is the DHS household roster itself, which is subject to the same patchy district coverage the framework was set up to address, so a coherent extension would need to smooth intervention coverage through an SAE step of its own before plugging it in.
+
+No independent district-level gold-standard malaria prevalence dataset is available for the three study countries. The Malaria Atlas Project provides continuous geostatistical surfaces from a partially overlapping data ecosystem and is a useful regional reference, but it uses a different modelling tradition and is itself a modelled product. A formal MAP-versus-SAE concordance analysis at district scale would be informative for both modelling traditions and is set out as a natural next step.
+
+# Conclusion
+\label{sec:conclusion}
+
+# Code and Data Availability
+
+The full analysis code is publicly available at \url{https://github.com/SAHagen/HDS5106}. The repository contains the methodological workbook (`small_area_estimation_project_final.Rmd`), the standardised covariate panels for the seven district-level covariates committed as CSV files, and the supporting helper scripts. The processed and standardised covariates being included as CSVs means the upstream covariate-extraction pipeline does not need to be re-run in order to refit the models; the workbook reads them directly.
+
+Three classes of inputs are not committed to the repository and must be obtained by the reader. The first is the DHS microdata. The DHS recode files and cluster GPS shapefiles are released under a project-specific licence by the DHS Programme that does not permit redistribution. A reader wishing to reproduce the fits must register and submit a project request at \url{https://dhsprogram.com/data/}, after which the recode and GPS files for the six surveys used in this work (Burkina Faso 2010 and 2021, CC4te d'Ivoire 2011-12 and 2021, Ghana 2014 and 2022) can be downloaded and placed in the per-country folders the workbook expects. The folder structure is listed in the repository's `.gitignore` and is documented in the workbook's data ingestion section. The second is the raw covariate rasters from SRTM (elevation), CHIRPS (rainfall), MODIS (land surface temperature), VIIRS (nighttime lights) and WorldPop (population), which are openly available from their respective providers; the workbook's covariate-extraction chunks document the API endpoints and download paths used. The third class is the cached Stan fits. Refitting Models 4, 4a, 4b and the edge-deletion sensitivity takes several hours each on a four-core laptop, and the cached fits are stored under `output/fits/` once they have been produced. A reader running the workbook for the first time will recompile the Stan programs and refit each model; subsequent knits will read the cached `.rds` files.
+
+The full library list is loaded in the workbook's setup chunk. The principal dependencies are `cmdstanr` (with CmdStan version 2.34 or higher), `survey`, `sf`, `spdep`, `posterior`, `loo`, `bayesplot`, `ggplot2`, `dplyr`, `tidyr`, `purrr` and `patchwork`. The fits reported in this report were obtained using R version 4.3 and CmdStan 2.34, with four chains run in parallel on a four-core machine. Total compute time across all eleven Stan fits was approximately twelve hours.
+
+
+# References {-}
