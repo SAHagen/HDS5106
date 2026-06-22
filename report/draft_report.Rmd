@@ -150,7 +150,7 @@ knitr::kable(surveys,
 ### District panel
 \label{sec:panel}
 
-District boundaries were obtained from GADM v4.1 and harmonised to the finest administrative geography at which malaria control programmes are implemented in each country: admin-2 for Ghana (260 districts), admin-3 for Burkina Faso (351 communes) and admin-3 for Côte d'Ivoire (113 departments), giving a combined panel of $N = 724$ districts across the three countries. Boundary changes between rounds were resolved through majority-area cross-walks. Spatial assignment of DHS clusters to districts uses the nearest-feature rule rather than strict point-in-polygon, to avoid mis-assignments arising from GPS displacement near borders.
+District boundaries were obtained from the Database of Global Administrative Areas (GADM) v4.1 and harmonised to the finest administrative geography at which malaria control programmes are implemented in each country: admin-2 for Ghana (260 districts), admin-3 for Burkina Faso (351 communes) and admin-3 for Côte d'Ivoire (113 departments), giving a combined panel of $N = 724$ districts across the three countries. Boundary changes between rounds were resolved through majority-area cross-walks. Spatial assignment of DHS clusters to districts uses the nearest-feature rule rather than strict point-in-polygon, to avoid mis-assignments arising from GPS displacement near borders.
 
 ### Covariates
 \label{sec:covariates}
@@ -173,10 +173,10 @@ covar_table <- data.frame(
                 "Accessibility from major centres reflects the practical reach of interventions and treatment.",
                 "Density modifies effective transmission intensity and human-vector contact rates.",
                 "Household-level deprivation drives ITN ownership, care-seeking and housing quality."),
-  Source = c("SRTM 1km DEM",
-             "CHIRPS daily precip.",
-             "MODIS LST",
-             "VIIRS composite",
+  Source = c("Shuttle Radar Topography Mission (SRTM) 1km Digital Elevation Model (DEM)",
+             "Climate Hazards Group InfraRed Precipitation with Station Data (CHIRPS) 3 month rolling average daily precip.",
+             "Moderate Resolution Imaging Spectroradiometer Land Surface Temperature (MODIS LST)",
+             "National Aeronautics and Space Administration Visible Infrared Imaging Radiometer Suite (VIIRS) composite",
              "Friction surface",
              "WorldPop + shapefile",
              "Census, district (GHA), region (BFA, CIV)"),
@@ -218,6 +218,9 @@ Population density modifies human–vector contact rates and complements the nig
 
 \paragraph{Multidimensional poverty index.}
 MPI indexes the deprivation gradient that drives ITN ownership, care-seeking, housing quality and IRS acceptance [@tusting2017housing; @tusting2019mapping]. For Ghana, the district-level MPI was extracted from the Ghana Statistical Service StatsBank API [@florey2014]; for Burkina Faso (RGPH 2019) and Côte d'Ivoire (ENV 2015), MPI is published only at admin-1 level and the regional value was assigned uniformly to every district within the region, so the MPI slope for these two countries is identified by between-region variation. This regional-imputation caveat is revisited in Section \ref{sec:limitations}.
+
+### Data Wrangling
+
 
 ## Direct estimation
 \label{sec:direct}
@@ -945,18 +948,24 @@ knitr::include_graphics("trace_plots.png")
 # Discussion
 \label{sec:discussion}
 
+## Policy Implications
 
+The change over time in the model for each country shows a general negative trend over time, particularly in Ghana and in Burkina Faso. This negative trend shows a drop in malaria prevalence, and thus effective policy in malaria outbreak zones. Many of the districts that show the highest prevalence also show the highest negative change in prevalence. However, in Côte d'Ivoire, the opposite is shown. There is a slight positive trend in malaria prevalence, which shows higher rates in 2021 than in 2010. This could be the result of many different factors and requires further investigation. 
 
 ## Limitations and weaknesses
 \label{sec:limitations}
 
-Access to clean district-level census data for the social covariates was possible only for Ghana, where the Ghana Statistical Service publishes admin-2 poverty and education figures from the 2010 and 2021 censuses. For Burkina Faso and Cote d'Ivoire no equivalent admin-2 census source was available within the timeframe of the project, and the social covariate used in the multi-country specifications is the subnational Multidimensional Poverty Index published on the Humanitarian Data Exchange by the Oxford Poverty and Human Development Initiative. This index is published at the regional (admin-1) level for both countries, so every district within a region carries the same value, and within-region variation in poverty is absorbed into the spatial random effect rather than into the poverty coefficient. It is also itself a derived indicator computed from DHS and MICS surveys rather than a census measurement, so the covariate carries its own modelling uncertainty that the Fay-Herriot framework treats as if it were observed without error. The DHS RDT outcome is based on detection of the *Plasmodium falciparum* HRP2 antigen, and *pfhrp2/3* gene deletions have been documented in West Africa with rising prevalence; what we estimate is RDT-positive prevalence, which may diverge from true infection prevalence where these deletions are common.
+Access to clean district-level census data for the social covariates was possible only for Ghana, where the Ghana Statistical Service publishes admin-2 poverty and education figures from the 2010 and 2021 censuses. For Burkina Faso and Cote d'Ivoire no equivalent admin-2 census source was available within the timeframe of the project, and the social covariate used in the multi-country specifications is the subnational Multidimensional Poverty Index published on the Humanitarian Data Exchange by the Oxford Poverty and Human Development Initiative. This index is published at the regional (admin-1) level for both countries, so every district within a region carries the same value, and within-region variation in poverty is absorbed into the spatial random effect rather than into the poverty coefficient. It is also itself a derived indicator computed from DHS and MICS surveys rather than a census measurement, so the covariate carries its own modelling uncertainty that the Fay-Herriot framework treats as if it were observed without error. The DHS RDT outcome is based on detection of the *Plasmodium falciparum* HRP2 antigen, and *pfhrp2/3* gene deletions have been documented in West Africa with rising prevalence; what we estimate is RDT-positive prevalence, which may diverge from true infection prevalence where these deletions are common. Additionally, DHS data is conducted on households as opposed to individuals. As such, there may be further systematically missing data.
 
 The sampling variance $\psi_{it}^2$ is treated as known and fixed at its design-based estimate, following the standard Fay-Herriot convention [@fay1979; @you2002]. For districts with very few clusters this design-based estimate is itself uncertain, and the framework does not propagate that uncertainty; smoothing the variance through a generalised variance function would relax the assumption but was not implemented here. The BYM2 spatial field is also assumed time-invariant in Models 3, 4, 4a and 4b. The dominant ecological drivers of the regional gradient move on decadal timescales and a single field is substantively defensible, but with only two rounds the data cannot strongly test the assumption, and Knorr-Held Type II and higher interactions that would let the spatial structure evolve are not separately identified [@knorrheld2000; @goicoa2018].
 
-The covariate set captures structural and environmental determinants of transmission but does not include intervention coverage. Insecticide-treated net distribution, indoor residual spraying, intermittent preventive treatment in pregnancy and seasonal malaria chemoprevention are spatially and temporally heterogeneous across the three countries, so their omission means the model describes the between-round trajectories without being able to attribute them to specific intervention rollouts. This is most consequential for Burkina Faso, where the rollout of seasonal malaria chemoprevention in the Sahel from 2014 onwards is the most likely proximate driver of the steep decline observed between 2010 and 2021. The most coherent district-level source of intervention coverage for all three countries is the DHS household roster itself, which is subject to the same patchy district coverage the framework was set up to address, so a coherent extension would need to smooth intervention coverage through an SAE step of its own before plugging it in.
+The covariate set captures structural and environmental determinants of transmission but does not include intervention coverage. Insecticide-treated net distribution, indoor residual spraying, intermittent preventive treatment in pregnancy and seasonal malaria chemoprevention are spatially and temporally heterogeneous across the three countries, so their omission means the model describes the between-round trajectories without being able to attribute them to specific intervention rollouts. This is most consequential for Burkina Faso, where the rollout of seasonal malaria chemoprevention in the Sahel from 2014 onwards is the most likely proximate driver of the steep decline observed between 2010 and 2021. The most coherent district-level source of intervention coverage for all three countries is the DHS household roster itself, which is subject to the same patchy district coverage the framework was set up to address, so a coherent extension would need to smooth intervention coverage through an SAE step of its own before plugging it in. 
 
 No independent district-level gold-standard malaria prevalence dataset is available for the three study countries. The Malaria Atlas Project provides continuous geostatistical surfaces from a partially overlapping data ecosystem and is a useful regional reference, but it uses a different modelling tradition and is itself a modelled product. A formal MAP-versus-SAE concordance analysis at district scale would be informative for both modelling traditions and is set out as a natural next step.
+
+## Future Work
+
+With the 2026 DHS survey being conducted momentarily in Togo, the next step would be to implement the 2013 and 2026 DHS surveys into the models. Many African countries are performing censuses in the upcoming years, namely the Democratic Republic of the Congo, Nigeria, Cameroon, and Sierra Leone. With census data from these countries, potential additions to the multi-country model could come within the realm of possibility. With finer outcome data, the model's precision and accuracy could improve.
 
 # Conclusion
 \label{sec:conclusion}

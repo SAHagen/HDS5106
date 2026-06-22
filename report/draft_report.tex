@@ -1499,6 +1499,15 @@ weakened identification of the country intercepts. The edge-deletion
 specification offers neither a predictive nor a parsimony advantage and
 weakens identification of the level parameters substantially.
 
+\begin{figure}[H]
+
+{\centering \includegraphics[width=0.7\linewidth,]{trace_plots} 
+
+}
+
+\caption{ Trace Plots for model diagnostics showing convergence of the 4 chains for Ghana space-time model\label{fig:trace-plots}}\label{fig:trace_plots}
+\end{figure}
+
 \section{Discussion}\label{discussion}
 
 \label{sec:discussion}
@@ -1580,10 +1589,10 @@ The full analysis code is publicly available at
 methodological workbook
 (\texttt{small\_area\_estimation\_project\_final.Rmd}), the standardised
 covariate panels for the seven district-level covariates committed as
-CSV files. The processed and standardised covariates being included as
-CSVs means the upstream covariate-extraction pipeline does not need to
-be re-run in order to refit the models; the workbook reads them
-directly.
+CSV files, and the supporting helper scripts. The processed and
+standardised covariates being included as CSVs means the upstream
+covariate-extraction pipeline does not need to be re-run in order to
+refit the models; the workbook reads them directly.
 
 Three classes of inputs are not committed to the repository and must be
 obtained by the reader. The first is the DHS microdata. The DHS recode
@@ -1614,7 +1623,9 @@ or higher), \texttt{survey}, \texttt{sf}, \texttt{spdep},
 \texttt{posterior}, \texttt{loo}, \texttt{bayesplot}, \texttt{ggplot2},
 \texttt{dplyr}, \texttt{tidyr}, \texttt{purrr} and \texttt{patchwork}.
 The fits reported in this report were obtained using R version 4.3 and
-CmdStan 2.34, with four chains run in parallel on a 8-core machine.
+CmdStan 2.34, with four chains run in parallel on a four-core machine.
+Total compute time across all eleven Stan fits was approximately twelve
+hours.
 
 \bibliographystyle{unsrtnat}
 \bibliography{references.bib}

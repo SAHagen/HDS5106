@@ -13,7 +13,7 @@ authors:
       School of Mathematics, Statistics and Applied Mathematics,
       University of Galway, Galway, Ireland
     email: g.zulu1@universityofgalway.ie
-  - name: Steward Hagen
+  - name: Stewart Hagen
     affiliation: |
       School of Mathematics, Statistics and Applied Mathematics,
       University of Galway, Galway, Ireland
