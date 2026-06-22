@@ -219,7 +219,11 @@ Population density modifies human–vector contact rates and complements the nig
 \paragraph{Multidimensional poverty index.}
 MPI indexes the deprivation gradient that drives ITN ownership, care-seeking, housing quality and IRS acceptance [@tusting2017housing; @tusting2019mapping]. For Ghana, the district-level MPI was extracted from the Ghana Statistical Service StatsBank API [@florey2014]; for Burkina Faso (RGPH 2019) and Côte d'Ivoire (ENV 2015), MPI is published only at admin-1 level and the regional value was assigned uniformly to every district within the region, so the MPI slope for these two countries is identified by between-region variation. This regional-imputation caveat is revisited in Section \ref{sec:limitations}.
 
-### Data Wrangling
+### Data Wrangling and Curation
+
+Data from the census was taken as is, and only standardized as stated in the previous section. No further changes or data wrangling were needed. DHS data were GPS based rather than district based, and to preserve anonymity, were shifted by a short distance from the true location. As such, some data points may have been shifted from one district to another. It is assumed that this was done uniformly and randomly, and as such, it is assumed that an equal number of households were shifted in each direction across the border. As such, no further adjustments were made to the DHS data either.
+
+Travel time to a medical facility, population density, and elevation publicly available as a raster from their corresponding sources. Data were trimmed to districts then averaged to get each district mean value. Rainfall data was accessed through station data, and the provided three month rolling average value was used. Some districts in Ghana did not have rainfall data and were treated as missing. 
 
 
 ## Direct estimation
@@ -948,9 +952,12 @@ knitr::include_graphics("trace_plots.png")
 # Discussion
 \label{sec:discussion}
 
-## Policy Implications
+## Key Findings and Policy Implications
 
-The change over time in the model for each country shows a general negative trend over time, particularly in Ghana and in Burkina Faso. This negative trend shows a drop in malaria prevalence, and thus effective policy in malaria outbreak zones. Many of the districts that show the highest prevalence also show the highest negative change in prevalence. However, in Côte d'Ivoire, the opposite is shown. There is a slight positive trend in malaria prevalence, which shows higher rates in 2021 than in 2010. This could be the result of many different factors and requires further investigation. 
+The change over time in the model for each country shows a general negative trend over time, particularly in Ghana and in Burkina Faso. This negative trend shows a drop in malaria prevalence, and thus effective policy in malaria outbreak zones. Many of the districts that show the highest prevalence also show the highest negative change in prevalence. However, in large portions of Côte d'Ivoire as well as in certain districts in Ghana, namely Kpandai, and Mion, the opposite was shown in the model. There is a slight positive trend in malaria prevalence in these districts, which could be the result of many different factors and requires further investigation. Whether Ghanian or Burkinabé policies are as effective as possible is another avenue of investigation, as it is also possible that the reduction in malaria prevalence is not the result of targeted outbreak prevention. Of the covariates, nightlights were found to be the most influential factor in prevention of malaria, followed by population density, temperature, and elevation. These variables are difficult to influence directly, and flagging districts with positively associated covariate values may be the only feasible approach.
+
+Potential follow-up polices using district level models could involve redirecting resources at district level as opposed to region level to prevent misallocation to districts where malaria is less prevalent. If a flagged district lies on the border with a neighboring nation, cross border cooperation could help prevent the disease from consistently crossing the border.
+
 
 ## Limitations and weaknesses
 \label{sec:limitations}
@@ -967,8 +974,13 @@ No independent district-level gold-standard malaria prevalence dataset is availa
 
 With the 2026 DHS survey being conducted momentarily in Togo, the next step would be to implement the 2013 and 2026 DHS surveys into the models. Many African countries are performing censuses in the upcoming years, namely the Democratic Republic of the Congo, Nigeria, Cameroon, and Sierra Leone. With census data from these countries, potential additions to the multi-country model could come within the realm of possibility. With finer outcome data, the model's precision and accuracy could improve.
 
+With finer data from Côte d'Ivoire and Burkina Faso, along with better data surrounding interventional and preventative treatment, more work can be done on a causal front. As discussed in the limitations section, no data were used regarding the types of treatment, rather different environmental factors. As such, very limited conclusions can be drawn regarding policy and treatment effectiveness, and correlations can only be drawn with environmental and social factors.
+
 # Conclusion
 \label{sec:conclusion}
+
+There is a general negative trend among Burkina Faso, Côte d'Ivoire, and Ghana in malaria prevalence from 2010 to 2021; however, some areas have seen increases in outcome predictions. Nightlights, as a proxy for urbanization, were found to be the most influential environmental effect on malaria prevalence, followed by population density and temperature. With the increase in urbanization of Africa and the continuation of climate change, all three of these variables are expected to increase. Combined with proper intervention, there is an opportunity to lower malaria prevalence in Sub-Saharan Africa. Areas with increased prevalence should be allocated more resources and investigative work should be carried out to determine potential causes.
+
 
 # Code and Data Availability
 
