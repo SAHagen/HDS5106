@@ -76,7 +76,27 @@ Galway, Galway, Ireland \\
 
 
 \begin{abstract}
-
+Malaria remains a leading cause of childhood mortality in sub-Saharan
+Africa, and sub-national targeting of interventions is now a strategic
+priority. Standard Demographic and Health Surveys are designed for
+regional rather than district-level estimation. We develop an area-level
+Bayesian small area estimation framework for under-five malaria
+prevalence at admin-2 district scale across Burkina Faso, Côte d'Ivoire
+and Ghana, combining six DHS rounds between 2010 and 2022 with seven
+environmental and social covariates. The framework uses the Fay-Herriot
+model with a BYM2 spatial prior on a 724-district shared adjacency graph
+including cross-border edges, country-specific calendar-year slopes
+hierarchically pooled around a regional mean, and a formal sensitivity
+battery around the cross-border specification. The model recovers three
+sharply divergent country trajectories that are stable across all
+sensitivity specifications: substantial declines in Burkina Faso (from
+approximately 70 to 19 per cent) and Ghana (33 to 15 per cent), and an
+increase in Côte d'Ivoire (22 to 31 per cent). Nighttime lights and
+population density are credibly protective at the regional scale. An
+informal external comparison with the Malaria Atlas Project surfaces
+corroborates the Burkina Faso and Ghana declines. The framework provides
+a coherent route to producing district-level posterior estimates with
+calibrated uncertainty for sub-national programme planning.
 \end{abstract}
 
 \keywords{
@@ -135,8 +155,8 @@ malaria chemoprevention there rather than elsewhere
 used here as a proxy for urbanicity, captures the well-documented
 gradient by which urban districts have lower prevalence than rural ones:
 built surfaces displace breeding habitat, sanitation is denser, and
-human--vector contact is reduced \citep{hay2005urbanization}. Yet
-climate and land cover do not act alone. Two districts with identical
+human-vector contact is reduced \citep{hay2005urbanization}. Yet climate
+and land cover do not act alone. Two districts with identical
 environmental conditions can still differ in burden, because what
 matters is how often an infectious bite reaches a susceptible child and
 how quickly that child is treated. Housing quality is among the
@@ -170,7 +190,7 @@ priority \citep{who2023}, and the High Burden to High Impact initiative
 has since made sub-national risk stratification a defining feature of
 national malaria control planning.
 
-The Demographic and Health Surveys (DHS) Programme provides the
+The Demographic and Health Surveys (DHS) Programme provides
 internationally standardised population-based source of childhood
 malaria infection data in sub-Saharan Africa. Since approximately 2010
 the standard biomarker module has included an HRP2-based rapid
@@ -322,8 +342,9 @@ Ghana & DHS 2022 & Oct 2022 to Jan 2023 & 124\\
 
 \label{sec:panel}
 
-District boundaries were obtained from GADM v4.1 and harmonised to the
-finest administrative geography at which malaria control programmes are
+District boundaries were obtained from the Database of Global
+Administrative Areas (GADM) v4.1 and harmonised to the finest
+administrative geography at which malaria control programmes are
 implemented in each country: admin-2 for Ghana (260 districts), admin-3
 for Burkina Faso (351 communes) and admin-3 for Côte d'Ivoire (113
 departments), giving a combined panel of \(N = 724\) districts across
@@ -350,21 +371,21 @@ rainfall and temperature is encoded at the data level rather than
 through an explicit seasonality term. Each covariate was standardised to
 zero mean and unit variance prior to model fitting.
 
-\begingroup\fontsize{7}{9}\selectfont
+\begingroup\fontsize{9}{11}\selectfont
 
-\begin{longtable}[t]{l>{\raggedright\arraybackslash}p{5.5cm}ll}
-\caption{\label{tab:covariates}Covariates used in the cross-border models, the substantive mechanism for the malaria-prevalence relationship, the data source and the primary reference. \label{tab:covariates}}\\
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{2cm}>{\raggedright\arraybackslash}p{6cm}>{\raggedright\arraybackslash}p{4cm}>{\raggedright\arraybackslash}p{2.8cm}}
+\caption{\label{tab:covariates}Covariates used in the cross-border models, with the substantive mechanism, data source and primary reference. \label{tab:covariates}}\\
 \toprule
 Covariate & Mechanism & Source & Reference\\
 \midrule
-Elevation & Altitude lowers ambient temperature and slows parasite development inside Anopheles vectors. & SRTM 1km DEM & Bhatt et al. (2015)\\
-Rainfall & Rainfall sustains vector breeding sites; wet-season totals are a standard environmental driver. & CHIRPS daily precip. & Funk et al. (2015)\\
-Temperature & Temperature governs vector survival and the extrinsic incubation period; optimum near 25 C. & MODIS LST & Bhatt et al. (2015)\\
-Nighttime lights & Urbanisation reduces larval habitat and improves housing and healthcare access. & VIIRS composite & Elvidge et al. (2021)\\
-Travel time & Accessibility from major centres reflects the practical reach of interventions and treatment. & Friction surface & Weiss et al. (2020)\\
+Elevation & Altitude lowers ambient temperature and slows parasite development inside Anopheles vectors. & SRTM 1 km DEM & Bhatt et al. (2015)\\
+Rainfall & Rainfall sustains vector breeding sites; wet-season totals are a standard environmental driver. & CHIRPS 3-month precipitation & Funk et al. (2015)\\
+Temperature & Temperature governs vector survival and the extrinsic incubation period; optimum near 25 C. & MODIS land surface temperature & Bhatt et al. (2015)\\
+Nighttime lights & Urbanisation reduces larval habitat and improves housing and healthcare access. & VIIRS nighttime lights composite & Elvidge et al. (2021)\\
+Travel time & Accessibility from major centres reflects the practical reach of interventions and treatment. & MAP friction surface & Weiss et al. (2020)\\
 \addlinespace
-Pop. density & Density modifies effective transmission intensity and human-vector contact rates. & WorldPop + shapefile & WHO (2023)\\
-Poverty & Household-level deprivation drives ITN ownership, care-seeking and housing quality. & Census, district (GHA), region (BFA, CIV) & Florey (2014)\\
+Pop. density & Density modifies effective transmission intensity and human-vector contact rates. & WorldPop gridded population & WHO (2023)\\
+Poverty & Household-level deprivation drives ITN ownership, care-seeking and housing quality. & Census (GHA); OPHI MPI (BFA, CIV) & Florey (2014)\\
 \bottomrule
 \end{longtable}
 \endgroup{}
@@ -430,6 +451,26 @@ regional value was assigned uniformly to every district within the
 region, so the MPI slope for these two countries is identified by
 between-region variation. This regional-imputation caveat is revisited
 in Section \ref{sec:limitations}.
+
+\subsubsection{Data Wrangling and
+Curation}\label{data-wrangling-and-curation}
+
+Data from the census was taken as is, and only standardized as stated in
+the previous section. No further changes or data wrangling were needed.
+DHS data were GPS based rather than district based, and to preserve
+anonymity, were shifted by a short distance from the true location. As
+such, some data points may have been shifted from one district to
+another. It is assumed that this was done uniformly and randomly, and as
+such, it is assumed that an equal number of households were shifted in
+each direction across the border. As such, no further adjustments were
+made to the DHS data either.
+
+Travel time to a medical facility, population density, and elevation
+publicly available as a raster from their corresponding sources. Data
+were trimmed to districts then averaged to get each district mean value.
+Rainfall data was accessed through station data, and the provided three
+month rolling average value was used. Some districts in Ghana did not
+have rainfall data and were treated as missing.
 
 \subsection{Direct estimation}\label{direct-estimation}
 
@@ -752,7 +793,7 @@ predictor is \begin{equation}
 
 }
 
-\caption{Combined 724-district adjacency graph. The network illustrates within-country connections (blue) and cross-border edges (highlighted in red). Rather than treating political borders as impermeable boundaries, this joint spatial weight matrix ($W$) enables the cross-border borrowing of strength. Consequently, information flows directly between neighboring districts across the three-country region, allowing the BYM2 hyperparameters to be shared globally. \label{fig:m1-maps}}\label{fig:combined-W}
+\caption{Combined 724-district adjacency graph. The network illustrates within-country connections (blue) and cross-border edges (highlighted in red). Rather than treating political borders as impermeable boundaries, this joint spatial weight matrix ($W$) enables the cross-border borrowing of strength. Consequently, information flows directly between neighboring districts across the three-country region, allowing the BYM2 hyperparameters to be shared globally. \label{fig:combined-W}}\label{fig:combined-W}
 \end{figure}
 
 The shared BYM2 hyperparameters and the cross-border edges of \(W\)
@@ -920,7 +961,7 @@ standardised within country to unit variance and zero mean prior to
 model fitting, so each coefficient is interpreted as the change in
 logit-prevalence per one-standard-deviation change in the covariate.
 
-\subsection{4.1 Direct estimates and
+\subsection{Direct estimates and
 coverage}\label{direct-estimates-and-coverage}
 
 Coverage of the panel varies substantially by country and round. In
@@ -940,7 +981,7 @@ d'Ivoire 2012 and 26.4 per cent for Côte d'Ivoire 2021. These values are
 within Monte Carlo error of the model-based national prevalences
 reported in the sections that follow.
 
-\subsection{4.2 Model 1: cross-sectional Ghana
+\subsection{Model 1: cross-sectional Ghana
 baseline}\label{model-1-cross-sectional-ghana-baseline-1}
 
 The three Model 1 variants on the Ghana 2022 cross-section converged
@@ -986,12 +1027,29 @@ structured and half is district-specific noise.
 
 \begin{figure}[H]
 
+{\centering \includegraphics[width=0.7\linewidth,]{caterpillar_plot_ghana_r2} 
+
+}
+
+\caption{District-level prevalence estimates for Ghana 2022 under Model 1 BYM2, sorted by posterior median. Each point is one of the 260 districts with its 90 per cent credible interval. Blue districts contained at least one DHS cluster in 2022 (observed); gold districts contained none (unobserved). Unobserved districts carry visibly wider credible intervals, reflecting their greater reliance on spatial smoothing and the covariate signal\label{fig:caterpillar-gha-r2}}\label{fig:caterpillar-gha-r2}
+\end{figure}
+
+\begin{figure}[H]
+
 {\centering \includegraphics[width=0.7\linewidth,]{model_comparison_maps_ghana} 
 
 }
 
 \caption{Model 1 estimated under-five malaria prevalence for Ghana 2022: direct estimates (top-left), IID (top-right), ICAR (bottom-left), BYM2 (bottom-right). Districts with no observed clusters are shown in white in the direct panel and filled by the model in the model-based panels. \label{fig:m1-maps}}\label{fig:m1-maps}
 \end{figure}
+
+The district-level posterior estimates from this fit are shown in Figure
+\textbackslash ref\{fig:caterpillar-gha-r2). The wider credible
+intervals on unobserved districts make visible the cost of relying on
+spatial smoothing and covariate information rather than direct survey
+evidence, and the smooth interleaving of observed and unobserved
+districts across the ordered support shows that the model does not
+artifactually separate the two groups.
 
 The covariate effects are broadly consistent across the three variants
 and credibly identify two of the seven coefficients under the BYM2 fit.
@@ -1041,7 +1099,7 @@ that the BYM2 prior is empirically well-supported at district scale and
 is the appropriate working choice for the country-level and
 three-country specifications that follow.
 
-\subsection{4.3 Model 2: country-level
+\subsection{Model 2: country-level
 space-time}\label{model-2-country-level-space-time}
 
 Model 2 was fitted independently to each country with the calendar-year
@@ -1173,7 +1231,7 @@ credible intervals on the spatial parameters and would benefit most from
 borrowing. The three-country models that follow address this, beginning
 with the temporally aligned single-time model.
 
-\subsection{4.4 Model 3: three-country
+\subsection{Model 3: three-country
 single-time}\label{model-3-three-country-single-time-1}
 
 Model 3 fits the second survey rounds of all three countries (Burkina
@@ -1190,7 +1248,7 @@ posterior is consistent with the cross-border specification on
 temporally aligned data and serves as the structural baseline for the
 two-time Model 4.
 
-\subsection{4.5 Model 4: three-country two-time, calendar
+\subsection{Model 4: three-country two-time, calendar
 year}\label{model-4-three-country-two-time-calendar-year}
 
 Model 4 extends Model 3 to both rounds with country-specific linear
@@ -1275,7 +1333,7 @@ substantive expectation that residual variation reflects unmeasured but
 spatially smooth determinants such as vector ecology, intervention
 history and housing quality.
 
-\subsection{4.6 Sensitivity analyses}\label{sensitivity-analyses}
+\subsection{Sensitivity analyses}\label{sensitivity-analyses}
 
 We assess three structural relaxations of Model 4: time-varying
 covariate slopes (Model 4a), country-specific BYM2 hyperparameters
@@ -1333,7 +1391,7 @@ Parameter & Model 4 (Base) & Model 4a (Time-Varying) & Model 4b (Country BYM2) &
 \end{tabular}}
 \end{table}
 
-\subsubsection{4.6.1 Model 4a: time-varying covariate
+\subsubsection{Model 4a: time-varying covariate
 slopes}\label{model-4a-time-varying-covariate-slopes}
 
 Model 4a allows country-specific covariate slopes to differ between
@@ -1366,7 +1424,7 @@ changes seen in the Ghana temperature and Ghana log population density
 slopes; in both cases the Round 2 credible intervals widen and the
 between-round change is well within Monte Carlo noise.
 
-\subsubsection{4.6.2 Model 4b: country-specific BYM2
+\subsubsection{Model 4b: country-specific BYM2
 components}\label{model-4b-country-specific-bym2-components}
 
 Model 4b replaces the shared BYM2 hyperparameters with country-specific
@@ -1410,7 +1468,7 @@ parameters are \(\phi_1 = 0.62\) (\([0.25, 0.90]\)) for Ghana,
 half and pointing to predominantly structured residual variation in
 every country once the global mean and country intercepts are removed.
 
-\subsubsection{4.6.3 Edge-deletion
+\subsubsection{Edge-deletion
 sensitivity}\label{edge-deletion-sensitivity}
 
 The edge-deletion specification removes the \(78\) cross-border edges
@@ -1456,7 +1514,7 @@ cross-border edges would arrive at substantively the same conclusions
 about how the three countries' prevalence have moved between rounds and
 which covariates carry the dominant regional signal.
 
-\subsubsection{4.6.4 LOO-CV comparison across the cross-border
+\subsubsection{LOO-CV comparison across the cross-border
 specifications}\label{loo-cv-comparison-across-the-cross-border-specifications}
 
 Table 6 reports the leave-one-out cross-validation comparison across the
@@ -1499,88 +1557,375 @@ weakened identification of the country intercepts. The edge-deletion
 specification offers neither a predictive nor a parsimony advantage and
 weakens identification of the level parameters substantially.
 
+\subsubsection{Convergence and Mixing}\label{convergence-and-mixing}
+
+Convergence diagnostics for all fits followed the rank-normalised
+\(\widehat{R}\) statistic and bulk and tail effective sample sizes
+\citep{vehtari2021}, with numerical values reported alongside each model
+summary above. Figures \ref{fig:trace-plots} and \ref{fig:rank-plots}
+show representative visual checks: trace plots for the Model 1 Ghana
+2022 BYM2 cross-section, and rank histograms for the Model 4
+three-country two-time fit. The chains overlap freely with no visible
+trend or stickiness, and the rank histograms are approximately level
+with no chain-specific dominance. The same diagnostic battery was
+applied to every fit and passed on the substantive parameters of
+interest, with the only exceptions being the global intercept and
+country deviations under Model 4b and the edge-deletion specification,
+which were flagged explicitly in their subsections.
+
 \begin{figure}[H]
 
 {\centering \includegraphics[width=0.7\linewidth,]{trace_plots} 
 
 }
 
-\caption{ Trace Plots for model diagnostics showing convergence of the 4 chains for Ghana space-time model\label{fig:trace-plots}}\label{fig:trace_plots}
+\caption{Trace plots from the Model 1 Ghana 2022 BYM2 fit. Four parallel HMC chains, 2000 post-warmup iterations each.\label{fig:trace-plots}}\label{fig:trace_plots}
 \end{figure}
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=0.7\linewidth,]{rank_plots} 
+
+}
+
+\caption{Rank histograms for the structural parameters of the Model 4 three-country two-time fit. Approximately level bins across the rank space and absence of chain-specific dominance indicate well-mixing chains.\label{fig:rank-plots}}\label{fig:rank_plots}
+\end{figure}
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=0.7\linewidth,]{ppc_density} 
+
+}
+
+\caption{Posterior predictive density overlay for the Ghana 2022 cross-sectional fit. The solid dark line is the observed density of the direct logit-prevalence estimates; the light traces are the densities of the corresponding posterior predictive replicates. The observed density lies inside the predictive envelope, with a slight under-prediction in the right tail.\label{fig:ppc-density}}\label{fig:ppc-density}
+\end{figure}
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=0.7\linewidth,]{residual_boxplot_country_time} 
+
+}
+
+\caption{Raw residuals on the logit scale by country and round under the three-country two-time Model 4 fit. Boxes are approximately centred on zero across all six country-rounds; the slight negative median in the Côte d'Ivoire and Ghana panels is consistent with mild under-prediction at the upper end of the prevalence range.\label{fig:residual-boxplot-country-time}}\label{fig:residual-boxplot}
+\end{figure}
+
+Posterior predictive checks support the adequacy of the model fit. The
+density overlay for the Ghana 2022 cross-sectional fit Figure
+\ref{fig:ppc-density} shows the observed density of the direct
+logit-prevalence estimates lying inside the envelope of posterior
+predictive replicates, with a slight under-prediction visible in the
+right tail of the distribution. Raw residuals by country-round under the
+three-country Model 4 fit Figure \ref{fig:residual-boxplot-country-time}
+are approximately centred on zero across all six country-rounds, with a
+slight negative median in the Côte d'Ivoire and Ghana panels indicating
+mild under-prediction at the upper end of the prevalence range. Neither
+pattern materially affects the substantive parameter posteriors.
 
 \section{Discussion}\label{discussion}
 
 \label{sec:discussion}
 
-\subsection{Limitations and
-weaknesses}\label{limitations-and-weaknesses}
+This study presents a three-country area-level Bayesian small area
+estimation of under-five malaria prevalence at admin-2 district scale
+across Burkina Faso, Côte d'Ivoire and Ghana, combining successive DHS
+rounds with environmental and social covariates. The Bayesian
+Fay-Herriot framework with BYM2 spatial prior recovered three sharply
+divergent country trajectories that are consistent across the
+country-level and three-country specifications and through three
+structural sensitivity analyses: substantial decline in Burkina Faso and
+Ghana between rounds, and an increase in Côte d'Ivoire. At the regional
+level the model identifies a small set of environmental and demographic
+covariates with credibly protective effects and locates the residual
+spatial variation predominantly in the structured component of the BYM2
+field. The contribution of this work is the joint application of
+established components of the area-level small area estimation tradition
+\citep{wu2021} to under-five malaria prevalence across three West
+African countries on a shared adjacency graph that respects ecological
+rather than administrative boundaries, with country-specific
+calendar-year slopes hierarchically pooled around a regional mean and a
+formal sensitivity battery around the cross-border specification.
+Comparable prior work has applied small area estimation to malaria at
+communal level in Burkina Faso \citep{bassinga2024} and to
+spatio-temporal malaria risk in Rwanda using survey and routine data
+\citep{semakula2023}, and multi-country small area estimation has been
+applied to HIV across East and Southern Africa using a shared adjacency
+graph \citep{saldarriaga2020}; the framework presented here brings these
+elements together at admin-2 district scale across three contiguous West
+African countries.
 
-\label{sec:limitations}
+The Burkina Faso decline, with posterior median prevalence falling from
+roughly 70\% in 2010 to below 20\% in 2021, aligns temporally with the
+country's seasonal malaria chemoprevention programme, launched in 2014
+and scaled rapidly thereafter. Multiple independent evaluations have
+documented substantial SMC-attributable reductions in paediatric malaria
+under routine programme conditions: a quasi-experimental study in Kaya
+District estimated protective effects of 51\% on point prevalence and
+62\% on period prevalence in 2014-2015 \citep{druetz2018};
+national-scale assessments confirmed the effect across SMC and non-SMC
+health districts \citep{kirakoya2022}; and a DHS-based analysis of the
+2010, 2014 and 2017 surveys detected reduced odds of RDT-positive
+malaria for up to two months post-SMC \citep{cola2022}. The Ghana
+decline between 2014 and 2022, while more moderate, is consistent with
+the broader West African trend documented by Malaria Atlas Project
+geostatistical mapping \citep{bhatt2015, weiss2020} and with the
+trajectory targeted by the country's model-supported malaria programme
+\citep{awine2017}; the most recent World Malaria Report places Ghana
+among the countries showing measurable progress towards the 2030
+burden-reduction targets \citep{who2024}. The Côte d'Ivoire trajectory
+cuts against this regional pattern. Our model places paediatric
+prevalence rising from approximately 22\% in 2012 to 31\% in 2021, in
+agreement with the official 2021 DHS report which records a national
+increase from 18\% in 2011 to 26\% \citep{civdhs2021}, and with a recent
+multi-country geospatial analysis that identifies Côte d'Ivoire as one
+of the consistently high-prevalence countries in the region
+\citep{aide2025}. Two structural factors plausibly contribute. First,
+seasonal malaria chemoprevention has not been deployed nationally in
+Côte d'Ivoire over the study window; the country's first SMC pilot was
+only initiated in 2021 in the Dikodougou health district
+\citep{kangah2024}, in stark contrast to Burkina Faso's national
+rollout. Second, the dominant vector \emph{Anopheles gambiae sensu lato}
+across coastal Côte d'Ivoire showed strong pyrethroid resistance in
+bioassays conducted between 2018 and 2020, with mortality remaining
+below 98\% even at ten-fold the standard diagnostic dose
+\citep{yokoly2024}. Our framework cannot causally attribute any of the
+trajectories to specific programmatic decisions, but the contrast
+between Burkina Faso's national SMC programme and Côte d'Ivoire's
+absence of one is the most striking structural difference relevant to
+their divergent paths.
 
-Access to clean district-level census data for the social covariates was
-possible only for Ghana, where the Ghana Statistical Service publishes
-admin-2 poverty and education figures from the 2010 and 2021 censuses.
-For Burkina Faso and Cote d'Ivoire no equivalent admin-2 census source
-was available within the timeframe of the project, and the social
-covariate used in the multi-country specifications is the subnational
-Multidimensional Poverty Index published on the Humanitarian Data
-Exchange by the Oxford Poverty and Human Development Initiative. This
-index is published at the regional (admin-1) level for both countries,
-so every district within a region carries the same value, and
-within-region variation in poverty is absorbed into the spatial random
-effect rather than into the poverty coefficient. It is also itself a
-derived indicator computed from DHS and MICS surveys rather than a
-census measurement, so the covariate carries its own modelling
-uncertainty that the Fay-Herriot framework treats as if it were observed
-without error. The DHS RDT outcome is based on detection of the
-\emph{Plasmodium falciparum} HRP2 antigen, and \emph{pfhrp2/3} gene
-deletions have been documented in West Africa with rising prevalence;
-what we estimate is RDT-positive prevalence, which may diverge from true
-infection prevalence where these deletions are common.
+An informal external comparison with the Malaria Atlas Project surfaces,
+which estimate annual \emph{Plasmodium falciparum} parasite rate in
+children aged 2-10 (PfPR\(_{2-10}\)) using a unit-level Gaussian
+geostatistical framework drawing on a broader data ecosystem than the
+DHS alone, supports the direction of two of the three country
+trajectories recovered here and identifies the Côte d'Ivoire trajectory
+as the point of divergence between the two approaches. For Burkina Faso,
+MAP's national PfPR\(_{2-10}\) falls from approximately 73 \% in 2010 to
+26 \% in 2021, in close agreement with our 70 \% to 19 \% decline in DHS
+RDT-positive U5 prevalence; the magnitude of the absolute level in 2010
+is also strikingly similar across the two methods despite the metric and
+age-band differences. For Ghana, MAP shows a similar decline from
+approximately 46 \% in 2014 to 17 \% in 2022, again in directional
+agreement with our 33 \% to 15 \% decline. For Côte d'Ivoire, MAP's
+surface shows a decline from approximately 48 \% in 2012 to 35 \% in
+2021, which is in the opposite direction from the rise recovered by our
+model and confirmed by the 2021 DHS report \citep{civdhs2021}. The two
+methodological traditions are not directly substitutable: our model uses
+only DHS RDT records and operates at admin-2 with a discrete adjacency
+graph, whereas the MAP surface unifies multiple data ecosystems
+including routine surveillance into a continuous geostatistical field,
+and the discrepancy likely reflects the different ways the two methods
+weight DHS evidence against routine case data and against historical
+baselines. Both methods agree that Côte d'Ivoire remains a
+moderate-to-high-prevalence country and a regional outlier within the
+West African declining trend; they disagree on whether the
+within-country trajectory between 2012 and 2021 is upward or downward,
+which is itself an informative finding and is a question that a formal
+MAP-versus-SAE concordance analysis at district scale would be well
+positioned to resolve.
 
-The sampling variance \(\psi_{it}^2\) is treated as known and fixed at
-its design-based estimate, following the standard Fay-Herriot convention
-\citep{fay1979, you2002}. For districts with very few clusters this
-design-based estimate is itself uncertain, and the framework does not
-propagate that uncertainty; smoothing the variance through a generalised
-variance function would relax the assumption but was not implemented
-here. The BYM2 spatial field is also assumed time-invariant in Models 3,
-4, 4a and 4b. The dominant ecological drivers of the regional gradient
-move on decadal timescales and a single field is substantively
-defensible, but with only two rounds the data cannot strongly test the
-assumption, and Knorr-Held Type II and higher interactions that would
-let the spatial structure evolve are not separately identified
-\citep{knorrheld2000, goicoa2018}.
+A consistent feature across all the country-level and three-country
+specifications is that the residual spatial variation, after
+conditioning on covariates and the temporal component, is predominantly
+structured rather than unstructured. The BYM2 mixing parameter
+\(\varphi\), which represents the proportion of the marginal spatial
+variance attributable to the geographically smooth ICAR component, has
+posterior medians of approximately 0.6 to 0.7 across the country-level
+Model 2 fits and rises to 0.85 in the three-country Model 4
+specification. This pattern indicates that between roughly half and over
+four-fifths of the unexplained spatial variation is shared between
+neighbouring districts rather than being district-specific noise.
+Substantively this is consistent with the prevailing view that the
+unmeasured determinants of \emph{Plasmodium falciparum} transmission are
+themselves spatially smooth processes that operate at scales larger than
+a single district. These determinants include vector species composition
+and abundance, breeding-site availability tied to land use and surface
+water management practices such as small dams, irrigation schemes and
+seasonal water bodies, housing quality, intervention coverage history
+and the geographic accessibility of clinical services. The absence of
+land use, surface water management and intervention coverage covariates
+from our covariate set is a recognised limitation that we return to in
+the limitations subsection, and it is itself a structural reason the
+BYM2 field absorbs as much of the residual spatial variation as it does.
+The continental geostatistical surfaces of the Malaria Atlas Project
+show pronounced and coherent spatial structure in West Africa over
+successive years \citep{bhatt2015, weiss2020}, and recent district and
+communal level SAE in Burkina Faso has similarly emphasised
+heterogeneous but spatially clustered prevalence with rural communes
+carrying disproportionately higher risk \citep{bassinga2024}. A
+geospatial analysis of DHS data across eight West African countries also
+reports marked spatial heterogeneity in paediatric malaria prevalence
+with hotspots concentrated in Benin and Côte d'Ivoire and lower
+prevalence in Ghana \citep{aide2025}. The high posterior \(\varphi\)
+recovered specifically by our three-country Model 4 reflects an
+additional feature of the shared adjacency graph: the BYM2 field absorbs
+both within-country residual structure and between-country structure
+that the country intercepts \(\alpha_c\) do not fully capture, which is
+consistent with the cross-border nature of transmission processes that
+respect ecology rather than administrative boundaries
+\citep{riebler2016}.
 
-The covariate set captures structural and environmental determinants of
-transmission but does not include intervention coverage.
-Insecticide-treated net distribution, indoor residual spraying,
-intermittent preventive treatment in pregnancy and seasonal malaria
-chemoprevention are spatially and temporally heterogeneous across the
-three countries, so their omission means the model describes the
-between-round trajectories without being able to attribute them to
-specific intervention rollouts. This is most consequential for Burkina
-Faso, where the rollout of seasonal malaria chemoprevention in the Sahel
-from 2014 onwards is the most likely proximate driver of the steep
-decline observed between 2010 and 2021. The most coherent district-level
-source of intervention coverage for all three countries is the DHS
-household roster itself, which is subject to the same patchy district
-coverage the framework was set up to address, so a coherent extension
-would need to smooth intervention coverage through an SAE step of its
-own before plugging it in.
+Among the seven covariates included in the model, the strongest and most
+consistent protective signal at the regional level comes from nighttime
+lights, which has a credibly negative posterior under Model 4a and
+consistent negative point estimates across the country-level Model 2
+fits, with Burkina Faso and Côte d'Ivoire showing credible exclusion of
+zero. Log population density follows the same pattern, with a regional
+mean of approximately \(-0.21\) under Model 4a credibly excluding zero,
+and elevation joins these two covariates as credibly negative in the
+time-varying specification. These three covariates together describe the
+urbanisation gradient across the three countries: densely populated,
+electrified, lower-relief districts are associated with reduced
+under-five malaria prevalence at the regional scale. This finding is
+consistent with the broader urban-malaria literature, which has
+documented lower transmission intensity in urban environments owing to
+better housing quality, improved drainage and water management that
+suppresses vector breeding sites, higher access to clinical services and
+treatment, and reduced human-vector contact relative to rural settings
+\citep{bhatt2015, weiss2020}. The recent multi-country geospatial
+analysis of West African DHS data identifies similar associations, with
+urban residence and improved housing emerging as protective factors
+across the eight countries analysed \citep{aide2025}, and the
+communal-level SAE in Burkina Faso likewise emphasises substantially
+higher asymptomatic carriage in rural communes than in urban ones
+\citep{bassinga2024}. Temperature shows a consistently negative point
+estimate at the regional level with credible intervals that narrowly
+span zero in the time-invariant Model 4 specification; the negative
+direction is consistent with above-optimal mean temperatures suppressing
+vector survival in some districts, although the signal is too uncertain
+at our resolution to be interpreted strongly. The remaining covariates,
+rainfall, travel time and multidimensional poverty, do not credibly
+differ from zero at the regional mean. The between-country slope
+standard deviations \(\tau_k\) range between approximately 0.11 and
+0.22, indicating that the country-specific slopes do not depart strongly
+from the regional means once the data from the three countries are
+jointly modelled, although the country-level Model 2 fits identify a
+small number of country-specific effects worth noting: Ghana shows a
+credibly positive coefficient on multidimensional poverty in keeping
+with the expected positive association between poverty and malaria
+burden, while Côte d'Ivoire shows a credibly negative coefficient on
+travel time consistent with more accessible districts showing lower
+transmission intensity.
 
-No independent district-level gold-standard malaria prevalence dataset
-is available for the three study countries. The Malaria Atlas Project
-provides continuous geostatistical surfaces from a partially overlapping
-data ecosystem and is a useful regional reference, but it uses a
-different modelling tradition and is itself a modelled product. A formal
-MAP-versus-SAE concordance analysis at district scale would be
-informative for both modelling traditions and is set out as a natural
-next step.
+\subsection{Limitations and weaknesses}\label{sec:limitations}
+
+Several limitations apply to this analysis and should temper the
+interpretation of the findings.
+
+\textbf{Data resolution and measurement.} Access to clean district-level
+census data for the social covariates was possible only for Ghana, where
+the Ghana Statistical Service publishes admin-2 poverty and education
+figures from the 2010 and 2021 censuses. For Burkina Faso and Côte
+d'Ivoire no equivalent admin-2 census source was available within the
+timeframe of the project, and the social covariate used in the
+multi-country specifications is the subnational Multidimensional Poverty
+Index published on the Humanitarian Data Exchange by the Oxford Poverty
+and Human Development Initiative. This index is published at the
+regional (admin-1) level for both countries, so every district within a
+region carries the same value, and within-region variation in poverty is
+absorbed into the spatial random effect rather than into the poverty
+coefficient. It is also itself a derived indicator computed from DHS and
+MICS surveys rather than a census measurement, so the covariate carries
+its own modelling uncertainty that the Fay-Herriot framework treats as
+if it were observed without error. The DHS RDT outcome is based on
+detection of the \emph{Plasmodium falciparum} HRP2 antigen, and
+\emph{pfhrp2/3} gene deletions have been documented in West Africa with
+rising prevalence; what we estimate is RDT-positive prevalence, which
+may diverge from true infection prevalence where these deletions are
+common.
+
+\textbf{Modelling assumptions.} The sampling variance \(\psi_{it}^2\) is
+treated as known and fixed at its design-based estimate, following the
+standard Fay-Herriot convention \citep{fay1979, you2002}. For districts
+with very few clusters this design-based estimate is itself uncertain,
+and the framework does not propagate that uncertainty. The BYM2 spatial
+field is also assumed time-invariant in Models 3, 4, 4a and 4b. The
+dominant ecological drivers of the regional gradient move on decadal
+timescales and a single field is substantively defensible, but with only
+two rounds the data cannot strongly test the assumption, and Knorr-Held
+Type II and higher interactions that would let the spatial structure
+evolve are not separately identified \citep{knorrheld2000, goicoa2018}.
+
+\textbf{Missing intervention and environmental covariates.} The
+covariate set captures structural and environmental determinants of
+transmission at the resolution at which open-access remote-sensing
+products and HDX-hosted social indicators are available, but does not
+include intervention coverage or several environmental layers known to
+drive vector ecology. Insecticide-treated net distribution, indoor
+residual spraying, intermittent preventive treatment in pregnancy and
+seasonal malaria chemoprevention are spatially and temporally
+heterogeneous across the three countries, so their omission means the
+model describes the between-round trajectories without being able to
+attribute them to specific intervention rollouts. This is most
+consequential for Burkina Faso, where the rollout of seasonal malaria
+chemoprevention in the Sahel from 2014 onwards is the most likely
+proximate driver of the steep decline observed between 2010 and 2021,
+and for Côte d'Ivoire, where the absence of a national SMC programme
+over the study window is the most likely structural reason the country's
+trajectory diverges from its neighbours. The most coherent
+district-level source of intervention coverage for all three countries
+is the DHS household roster itself, which is subject to the same patchy
+district coverage the framework was set up to address, so a coherent
+extension would need to smooth intervention coverage through an SAE step
+of its own before plugging it in. The covariate set also omits several
+environmental layers that are known to mediate vector breeding-site
+availability and human-vector contact: district-level land use and land
+cover (including agricultural intensity, urban footprint and forest
+cover), surface water management infrastructure (small dams, irrigation
+schemes and seasonal water bodies), and housing-quality proxies (roof
+and wall material, electricity access). These omissions are themselves a
+structural reason the BYM2 spatial field absorbs as much of the residual
+spatial variation as it does.
+
+\textbf{External validation.} No independent district-level
+gold-standard malaria prevalence dataset is available for the three
+study countries. The Malaria Atlas Project provides continuous
+geostatistical surfaces from a partially overlapping data ecosystem and
+is a useful regional reference, but it uses a different modelling
+tradition and is itself a modelled product; the informal national-level
+comparison reported above shows directional agreement for Burkina Faso
+and Ghana and a methodologically informative discrepancy for Côte
+d'Ivoire. A formal MAP-versus-SAE concordance analysis at district scale
+would be informative for both modelling traditions and is set out as a
+natural next step.
+
+\subsection{Future Work}\label{future-work}
+
+The most immediate extension is to add further West African countries to
+the shared adjacency graph, with the Togo 2013 and forthcoming 2026 DHS
+rounds as the natural next test cases. Upcoming national censuses in the
+Democratic Republic of the Congo, Nigeria, Cameroon and Sierra Leone
+would unlock admin-2 social covariates directly from census, addressing
+the regional-resolution limitation that affects Burkina Faso and Côte
+d'Ivoire in the present work. The most consequential substantive
+extension is the incorporation of district-level intervention coverage
+(insecticide-treated nets, IPTp, seasonal malaria chemoprevention) as
+time-varying covariates, smoothed through a coupled SAE step on the DHS
+household roster, which would let the framework attribute observed
+trajectories to specific intervention rollouts rather than only to
+environmental and demographic correlates.
 
 \section{Conclusion}\label{conclusion}
 
 \label{sec:conclusion}
+
+This study documents three sharply divergent country trajectories in
+under-five malaria prevalence across Burkina Faso, Côte d'Ivoire and
+Ghana at admin-2 district resolution. The Bayesian Fay-Herriot framework
+with BYM2 spatial prior on a shared cross-border adjacency graph
+recovers country-specific transmission dynamics within a single coherent
+statistical framework and produces district-level posterior estimates
+with the full uncertainty propagation appropriate for sub-national
+programme planning. The trajectories are robust across country-level and
+three-country specifications and through three structural sensitivity
+analyses, and they are corroborated for Burkina Faso and Ghana by
+independent national-level estimates from the Malaria Atlas Project.
+Regional aggregates obscure these country-specific dynamics: three
+contiguous West African countries moved in opposite directions on
+under-five malaria prevalence over the same decade. Country-specific
+reporting at district scale, with full posterior uncertainty, is the
+resolution at which sub-national malaria programme decisions are
+actually made.
 
 \section{Code and Data Availability}\label{code-and-data-availability}
 
@@ -1601,21 +1946,19 @@ licence by the DHS Programme that does not permit redistribution. A
 reader wishing to reproduce the fits must register and submit a project
 request at \url{https://dhsprogram.com/data/}, after which the recode
 and GPS files for the six surveys used in this work (Burkina Faso 2010
-and 2021, CC4te d'Ivoire 2011-12 and 2021, Ghana 2014 and 2022) can be
+and 2021, Cote d'Ivoire 2011-12 and 2021, Ghana 2014 and 2022) can be
 downloaded and placed in the per-country folders the workbook expects.
 The folder structure is listed in the repository's \texttt{.gitignore}
 and is documented in the workbook's data ingestion section. The second
 is the raw covariate rasters from SRTM (elevation), CHIRPS (rainfall),
 MODIS (land surface temperature), VIIRS (nighttime lights) and WorldPop
 (population), which are openly available from their respective
-providers; the workbook's covariate-extraction chunks document the API
-endpoints and download paths used. The third class is the cached Stan
-fits. Refitting Models 4, 4a, 4b and the edge-deletion sensitivity takes
-several hours each on a four-core laptop, and the cached fits are stored
-under \texttt{output/fits/} once they have been produced. A reader
-running the workbook for the first time will recompile the Stan programs
-and refit each model; subsequent knits will read the cached
-\texttt{.rds} files.
+providers. The third class is the cached Stan fits. Refitting Models 4,
+4a, 4b and the edge-deletion sensitivity takes several hours each on a
+four-core laptop, and the cached fits are stored under
+\texttt{output/fits/} once they have been produced. A reader running the
+workbook for the first time will recompile the Stan programs and refit
+each model; subsequent knits will read the cached \texttt{.rds} files.
 
 The full library list is loaded in the workbook's setup chunk. The
 principal dependencies are \texttt{cmdstanr} (with CmdStan version 2.34
