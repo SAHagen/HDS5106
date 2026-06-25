@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.6.20)  24 JUN 2026 23:54
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.6.20)  25 JUN 2026 13:25
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -711,7 +711,7 @@ File: mt-msb.cfg 2005/06/01 v1.0 microtype config. file: AMS symbols (b) (RS)
 LaTeX Font Warning: Font shape `T1/lmr/bx/sc' undefined
 (Font)              using `T1/lmr/bx/n' instead on input line 78.
 
-LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 144.
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 146.
 (c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 ) [1
@@ -721,86 +721,83 @@ File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 [2{c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}] [3] [4{c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}] [5] [6{c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}] [7] [8]
-<three_country_adjacency.png, id=369, 722.7pt x 578.16pt>
+<three_country_adjacency.png, id=377, 722.7pt x 578.16pt>
 File: three_country_adjacency.png Graphic file (type png)
 <use three_country_adjacency.png>
-Package pdftex.def Info: three_country_adjacency.png  used on input line 792.
+Package pdftex.def Info: three_country_adjacency.png  used on input line 794.
 (pdftex.def)             Requested size: 328.82706pt x 263.0632pt.
 [9] [10
 pdfTeX warning (ext4): destination with the same identifier (name{figure.1}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.840 
-       <./three_country_adjacency.png>]
+l.843 \subsubsection
+                    {Sensitivity <./three_country_adjacency.png>]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <8> on input line 908.
+(Font)              <8> on input line 910.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <6> on input line 908.
-
-LaTeX Warning: `!h' float specifier changed to `!ht'.
-
-[11] [12
+(Font)              <6> on input line 910.
+[11
 pdfTeX warning (ext4): destination with the same identifier (name{table.3}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1027 
-       
+l.942 
+      ]
+<caterpillar_plot_ghana_r2.png, id=426, 722.7pt x 442.5333pt>
+File: caterpillar_plot_ghana_r2.png Graphic file (type png)
+<use caterpillar_plot_ghana_r2.png>
+Package pdftex.def Info: caterpillar_plot_ghana_r2.png  used on input line 1032.
+(pdftex.def)             Requested size: 328.82706pt x 201.35297pt.
+[12
 pdfTeX warning (ext4): destination with the same identifier (name{table.4}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1027 
-       ]
-<caterpillar_plot_ghana_r2.png, id=425, 722.7pt x 442.5333pt>
-File: caterpillar_plot_ghana_r2.png Graphic file (type png)
-<use caterpillar_plot_ghana_r2.png>
-Package pdftex.def Info: caterpillar_plot_ghana_r2.png  used on input line 1030.
-(pdftex.def)             Requested size: 328.82706pt x 201.35297pt.
-<model_comparison_maps_ghana.png, id=427, 1011.78pt x 400.3758pt>
+l.1037 \end{figure}
+                   ]
+<model_comparison_maps_ghana.png, id=435, 1011.78pt x 400.3758pt>
 File: model_comparison_maps_ghana.png Graphic file (type png)
 <use model_comparison_maps_ghana.png>
-Package pdftex.def Info: model_comparison_maps_ghana.png  used on input line 1039.
+Package pdftex.def Info: model_comparison_maps_ghana.png  used on input line 1041.
 (pdftex.def)             Requested size: 328.82706pt x 130.12057pt.
 [13
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1068 
-       
+l.1082 \end{longtable}
+                      
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1068 
-        <./caterpillar_plot_ghana_r2.png> <./model_comparison_maps_ghana.png>]
-
-LaTeX Warning: `!h' float specifier changed to `!ht'.
-
-[14]
-Underfull \vbox (badness 5119) has occurred while \output is active []
-
-[15
+l.1082 \end{longtable}
+                       <./caterpillar_plot_ghana_r2.png> <./model_comparison_maps_ghana.png>] [14
 pdfTeX warning (ext4): destination with the same identifier (name{table.6}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1251 \subsection
-                  {Model 4: three-country two-time, calendar]
+l.1182 
+       ]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+[15]
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
 [16] [17
 pdfTeX warning (ext4): destination with the same identifier (name{table.7}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1451 
+l.1453 
        ] [18]
-<trace_plots.png, id=473, 650.43pt x 433.62pt>
+<trace_plots.png, id=481, 650.43pt x 433.62pt>
 File: trace_plots.png Graphic file (type png)
 <use trace_plots.png>
-Package pdftex.def Info: trace_plots.png  used on input line 1578.
+Package pdftex.def Info: trace_plots.png  used on input line 1580.
 (pdftex.def)             Requested size: 328.82706pt x 219.22449pt.
-<rank_plots.png, id=474, 650.43pt x 433.62pt>
+<rank_plots.png, id=482, 650.43pt x 433.62pt>
 File: rank_plots.png Graphic file (type png)
 <use rank_plots.png>
-Package pdftex.def Info: rank_plots.png  used on input line 1587.
+Package pdftex.def Info: rank_plots.png  used on input line 1589.
 (pdftex.def)             Requested size: 328.82706pt x 219.22449pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -809,17 +806,17 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 pdfTeX warning (ext4): destination with the same identifier (name{figure.4}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1593 
+l.1595 
         <./trace_plots.png>]
-<ppc_density.png, id=483, 650.43pt x 433.62pt>
+<ppc_density.png, id=491, 650.43pt x 433.62pt>
 File: ppc_density.png Graphic file (type png)
 <use ppc_density.png>
-Package pdftex.def Info: ppc_density.png  used on input line 1596.
+Package pdftex.def Info: ppc_density.png  used on input line 1598.
 (pdftex.def)             Requested size: 328.82706pt x 219.22449pt.
-<residual_boxplot_country_time.png, id=484, 722.7pt x 382.0674pt>
+<residual_boxplot_country_time.png, id=492, 722.7pt x 382.0674pt>
 File: residual_boxplot_country_time.png Graphic file (type png)
 <use residual_boxplot_country_time.png>
-Package pdftex.def Info: residual_boxplot_country_time.png  used on input line 1605.
+Package pdftex.def Info: residual_boxplot_country_time.png  used on input line 1607.
 (pdftex.def)             Requested size: 328.82706pt x 173.84093pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -828,17 +825,17 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 pdfTeX warning (ext4): destination with the same identifier (name{figure.5}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1611 
+l.1613 
        
 pdfTeX warning (ext4): destination with the same identifier (name{figure.6}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1611 
+l.1613 
         <./rank_plots.png> <./ppc_density.png>] [21
 pdfTeX warning (ext4): destination with the same identifier (name{figure.7}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.1695 
+l.1697 
         <./residual_boxplot_country_time.png>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
@@ -857,18 +854,18 @@ Package rerunfilecheck Info: File `draft_report.out' has not changed.
 (rerunfilecheck)             Checksum: 55BC8E4E1645C59447C5B289E2537445;7453.
  ) 
 Here is how much of TeX's memory you used:
- 16346 strings out of 469158
- 261654 string characters out of 5458476
- 742350 words of memory out of 5000000
- 44588 multiletter control sequences out of 15000+600000
- 728639 words of font info for 244 fonts, out of 8000000 for 9000
+ 16352 strings out of 469158
+ 261741 string characters out of 5458476
+ 742213 words of memory out of 5000000
+ 44591 multiletter control sequences out of 15000+600000
+ 728769 words of font info for 245 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 74i,12n,79p,1009b,670s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 74i,12n,79p,1009b,672s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx12.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx7.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx8.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbxi10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmcsc10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmex10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi5.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi6.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi7.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi8.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmib10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr5.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr6.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr7.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr8.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr9.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmri10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy10.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy6.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy7.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy8.pfb><c:/Users/Godwill/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt10.pfb>
-Output written on draft_report.pdf (28 pages, 4668492 bytes).
+Output written on draft_report.pdf (28 pages, 4668051 bytes).
 PDF statistics:
- 744 PDF objects out of 1000 (max. 8388607)
- 640 compressed objects within 7 object streams
- 179 named destinations out of 1000 (max. 500000)
+ 750 PDF objects out of 1000 (max. 8388607)
+ 646 compressed objects within 7 object streams
+ 180 named destinations out of 1000 (max. 500000)
  54116 words of extra memory for PDF output out of 61914 (max. 10000000)
 

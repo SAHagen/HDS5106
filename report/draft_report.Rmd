@@ -1,10 +1,8 @@
 ---
 title: |
-  Bayesian Small Area Estimation of Under-Five Malaria Prevalence
-  in West Africa
+  Spatio-Temporal Bayesian Small Area Estimation of Under-Five Malaria Prevalence in West Africa
 subtitle: |
-  A Space-Time BYM2 Fay-Herriot Model Across Ghana, Burkina Faso
-  and Côte d'Ivoire
+  A Cross-Border BYM2 Fay-Herriot Framework Across Burkina Faso, Côte d'Ivoire and Ghana, 2010-2022
 authors:
   - name: Godwill Zulu
     affiliation: |
@@ -17,14 +15,15 @@ authors:
       School of Mathematical and Statistical Sciences,
       University of Galway, Galway, Ireland
 abstract: |
- Malaria remains a leading cause of childhood mortality in sub-Saharan Africa, and sub-national targeting of interventions is now a strategic priority. Standard Demographic and Health Surveys are designed for regional rather than district-level estimation. We develop an area-level Bayesian small area estimation framework for under-five malaria prevalence at admin-2 district scale across Burkina Faso, Côte d'Ivoire and Ghana, combining six DHS rounds between 2010 and 2022 with seven environmental and social covariates. The framework uses the Fay-Herriot model with a BYM2 spatial prior on a 724-district shared adjacency graph including cross-border edges, country-specific calendar-year slopes hierarchically pooled around a regional mean, and a formal sensitivity battery around the cross-border specification. The model recovers three sharply divergent country trajectories that are stable across all sensitivity specifications: substantial declines in Burkina Faso (from approximately 70 to 19 per cent) and Ghana (33 to 15 per cent), and an increase in Côte d'Ivoire (22 to 31 per cent). Nighttime lights and population density are credibly protective at the regional scale. An informal external comparison with the Malaria Atlas Project surfaces corroborates the Burkina Faso and Ghana declines. The framework provides a coherent route to producing district-level posterior estimates with calibrated uncertainty for sub-national programme planning.
+ Malaria remains a leading cause of childhood mortality in sub-Saharan Africa, and sub-national targeting of interventions is now a strategic priority. Standard Demographic and Health Surveys are designed for regional rather than district-level estimation. We develop an area-level Bayesian small area estimation framework for under-five malaria prevalence at admin-2 district scale across Burkina Faso, Côte d'Ivoire and Ghana, combining six DHS rounds between 2010 and 2022 with seven environmental and social covariates. The framework uses the Fay-Herriot model with a BYM2 spatial prior on a 724-district shared adjacency graph including cross-border edges, country-specific calendar-year slopes hierarchically pooled around a regional mean, and a formal sensitivity check around the cross-border specification. The model recovers three sharply divergent country trajectories that are stable across all sensitivity specifications: substantial declines in Burkina Faso (from approximately 70 to 19 per cent) and Ghana (33 to 15 per cent), and an increase in Côte d'Ivoire (22 to 31 per cent). Nighttime lights and population density are credibly protective at the regional scale. An informal external comparison with the Malaria Atlas Project surfaces supports the Burkina Faso and Ghana declines. The framework provides a coherent route to producing district-level posterior estimates with calibrated uncertainty for sub-national programme planning.
 
 keywords:
-  - small area estimation
+  - Small Area Estimation
   - Bayesian hierarchical model
   - BYM2 spatial prior
+  - Spatio-temporal
   - Fay-Herriot
-  - malaria prevalence
+  - Malaria Prevalence
   - West Africa
   - Demographic and Health Surveys
 bibliography: references.bib
@@ -100,7 +99,7 @@ The study pursues five specific objectives:
 
 \begin{enumerate}
 \item Construct a harmonised three-country district panel with consistent admin-2 boundaries across rounds, country-level and combined adjacency graphs, design-based direct prevalence estimates with calibrated sampling variances, and district-level covariates drawn from remote-sensed and census sources.
-\item Develop and validate a Bayesian Fay--Herriot framework by comparing a scaled BYM2 spatial prior against independent and identically distributed (IID) and pure intrinsic conditional autoregressive (ICAR) alternatives using a single-country cross-sectional baseline.
+\item Develop and validate a Bayesian Fay-Herriot framework by comparing a scaled BYM2 spatial prior against independent and identically distributed (IID) and pure intrinsic conditional autoregressive (ICAR) alternatives using a single-country cross-sectional baseline.
 \item Evaluate the value of multi-country spatial borrowing by comparing joint three-country specifications (both single-time and temporally varying) against independent country-specific models, to determine whether a shared adjacency preserves and refines country-level findings.
 \item Assess the robustness of the multi-country framework through formal sensitivity analyses testing time-varying covariate slopes, country-specific BYM2 hyperparameters, and the deletion of cross-border edges, using leave-one-out cross-validation to detect changes in expected predictive performance.
 \item Generate calibrated district-level posterior estimates of prevalence by country and round to serve as direct inputs for sub-national programme planning and intervention targeting.
@@ -111,7 +110,7 @@ The study pursues five specific objectives:
 The analysis is driven by three core research questions:
 
 \begin{enumerate}
-\item Does the BYM2 prior outperform IID and pure ICAR alternatives at the district scale for under-five malaria prevalence in a cross-sectional baseline, and what does this imply for the choice of spatial prior in subsequent multi-country space--time specifications?
+\item Does the BYM2 prior outperform IID and pure ICAR alternatives at the district scale for under-five malaria prevalence in a cross-sectional baseline, and what does this imply for the choice of spatial prior in subsequent multi-country space-time specifications?
 \item How have the prevalence trajectories of the three countries evolved between DHS rounds at a calendar-year scale, and how consistent are the temporal slopes derived from a joint multi-country model compared to those estimated independently per country?
 \item Are the conclusions regarding disease trajectories, covariate effects, and between-country heterogeneity robust to the principal structural assumptions of the multi-country framework, namely the time-invariance of covariate slopes, shared spatial hyperparameters across countries, and the inclusion of cross-border edges in the adjacency graph?
 \end{enumerate}
@@ -335,7 +334,7 @@ with components
 \item $\phi \in [0, 1]$, the mixing parameter that governs the balance between structured and unstructured variation: $\phi = 0$ recovers a pure IID prior, $\phi = 1$ recovers a pure ICAR prior, and intermediate values are a mixture;
 \item $v_i \sim \mathcal{N}(0, 1)$ independently across districts, the unstructured component;
 \item $u_i \sim \mathrm{ICAR}(W)$ as in equation \ref{eq:icar}, the structured component;
-\item $s$, a scaling factor computed from the generalised inverse of the ICAR structure matrix so that $\sigma_b$ has a consistent marginal-SD interpretation regardless of the adjacency structure [@riebler2016]. For graphs with disconnected components the scaling factor is computed per component [@freni2018; @donegan2021].
+\item $s$, a scaling factor computed from the generalised inverse of the ICAR structure matrix so that $\sigma_b$ has a consistent marginal-SD interpretation regardless of the adjacency structure \citep{riebler2016}. For graphs with disconnected components the scaling factor is computed per component \citep{freni2018}; \citep{donegan2021}.
 \end{itemize}
 
 Treating $\phi$ as an unknown parameter lets the data determine the mixture rather than imposing one or the other [@morris2019]. The BYM2 prior is the standard form used in Models 2 through 4 below; the Model 1 cross-sectional baseline compares it to its two limiting cases (pure IID and pure ICAR).
@@ -402,7 +401,7 @@ with components
 \item $b_i$, the BYM2 spatial residual on the within-country adjacency $W_c$ (equation \ref{eq:bym2}), shared across both rounds for district $i$;
 \item $\widetilde{\text{yr}}_{it} = \text{yr}_{it} - 2016$, the calendar year of survey $t$ in district $i$ centred at the regional midpoint 2016;
 \item $\delta_c$, the country-$c$ annual rate of change in logit prevalence;
-\item $\gamma_{it} \sim \mathcal{N}(0, \sigma_\gamma^{2})$, an unstructured space–time interaction following the Type I classification of [@knorrheld2000].
+\item $\gamma_{it} \sim \mathcal{N}(0, \sigma_\gamma^{2})$, an unstructured space–time interaction following the Type I classification of \citep{knorrheld2000}.
 \end{itemize}
 
 Fitting Model 2 separately for each country provides the within-country benchmark against which the multi-country specifications are compared.
@@ -420,7 +419,7 @@ with components
 \begin{itemize}
 \item $\mu$, the regional grand mean on the logit scale;
 \item $\alpha_c$, the country-$c$ deviation from the regional mean, identified by the sum-to-zero constraint $\sum_c \alpha_c = 0$;
-\item $\mathbf{x}_i$ and $\bm{\beta}_c$, district-level covariates and country-specific slopes; the slopes are partially pooled across countries through the hierarchical prior $\beta_{c, k} \sim \mathcal{N}(\bar{\beta}_k, \tau_k^{2})$ [@gelman2006];
+\item $\mathbf{x}_i$ and $\bm{\beta}_c$, district-level covariates and country-specific slopes; the slopes are partially pooled across countries through the hierarchical prior $\beta_{c, k} \sim \mathcal{N}(\bar{\beta}_k, \tau_k^{2})$ \citep{gelman2006};
 \item $b_i$, the BYM2 spatial residual on the cross-border graph $W$ (equation \ref{eq:bym2}), with shared hyperparameters $(\sigma_b, \phi)$ across the three countries.
 \end{itemize}
 
@@ -445,7 +444,7 @@ with components
 \item $b_i$, BYM2 on the cross-border graph $W$, time-invariant within a district (a single spatial surface is assumed to describe the residual spatial gradient across both rounds);
 \item $\widetilde{\text{yr}}_{it} = \text{yr}_{it} - 2016$, the centred calendar year of survey $t$ in district $i$;
 \item $\delta_c$, the country-$c$ annual rate of change in logit prevalence, with the country-level hierarchical prior $\delta_c \sim \mathcal{N}(\bar{\delta}, \sigma_\delta^{2})$;
-\item $\gamma_{it} \sim \mathcal{N}(0, \sigma_\gamma^{2})$, unstructured space–time interaction (Type I, [@knorrheld2000]).
+\item $\gamma_{it} \sim \mathcal{N}(0, \sigma_\gamma^{2})$, unstructured space–time interaction (Type I, \citep{knorrheld2000}).
 \end{itemize}
 
 Two notes on parameterisation. First, the temporal effect is expressed on calendar-year scale rather than as a round-to-round wave indicator because the surveys are not synchronised across countries (Round 1 spans 2010 to 2014, Round 2 spans 2021 to 2022): a wave indicator would conflate the country-specific elapsed time between rounds with the country-specific rate of change [@wakefield2020]. The between-round odds ratio for country $c$ is recovered as $\exp(\delta_c \cdot \Delta \text{yr}_c)$ where $\Delta \text{yr}_c$ is the actual elapsed years between rounds. Second, $b_i$ is time-invariant rather than time-varying: the dominant structural drivers of residual spatial variation (long-run climate, elevation, the durable component of urbanisation, accessibility) move on decadal timescales [@bhatt2015; @weiss2020], and with only two rounds per district a per-round spatial field $b_{i, t}$ is not separately identified from a saturated round-by-district interaction.
